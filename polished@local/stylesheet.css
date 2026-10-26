@@ -1,0 +1,175 @@
+/* Search boxes share the overview's cached wallpaper blur. Keep alpha on
+ * backgrounds only: labels, icons, native focus rings and geometry stay intact.
+ * Scoping to our root class also covers providers/results added while typing. */
+.polished-overview-material .search-section-content {
+    background-color: rgba(25, 28, 35, 0.60);
+    background-image: none;
+    border-color: rgba(255, 255, 255, 0.22);
+    color: #f2f2f2;
+}
+
+/* Keep the native entry outline/focus ring and folder radius/layout. These
+ * surfaces reveal the same overview backdrop; no additional blur is needed. */
+.polished-overview-material .search-entry {
+    background-color: rgba(25, 28, 35, 0.60);
+    background-image: none;
+    color: #f2f2f2;
+}
+
+.polished-overview-material .search-entry:hover {
+    background-color: rgba(25, 28, 35, 0.68);
+}
+
+.polished-overview-material .search-entry:focus {
+    background-color: rgba(25, 28, 35, 0.76);
+}
+
+.polished-overview-material .search-entry:insensitive {
+    background-color: rgba(25, 28, 35, 0.48);
+    color: rgba(242, 242, 242, 0.4);
+}
+
+.polished-overview-material .search-entry StLabel.hint-text,
+.polished-overview-material .search-entry .search-entry-icon {
+    color: rgba(242, 242, 242, 0.78);
+}
+
+.polished-overview-material .app-folder-dialog {
+    background-color: rgba(25, 28, 35, 0.70);
+    background-image: none;
+    color: #f2f2f2;
+}
+
+/* A hairline on large cards gives separation without an extra blur layer.
+ * Insets follow each theme's rounded shape and leave allocations untouched.
+ * Search entry focus rings and result selection outlines remain native. */
+.polished-overview-material .search-section-content,
+.polished-overview-material .app-folder-dialog {
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+}
+
+.polished-overview-material .list-search-result,
+.polished-overview-material .search-provider-icon,
+.polished-overview-material .grid-search-result {
+    background-color: transparent;
+    color: #f2f2f2;
+}
+
+.polished-overview-material .list-search-result:hover,
+.polished-overview-material .search-provider-icon:hover,
+.polished-overview-material .grid-search-result:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+}
+
+.polished-overview-material .list-search-result:focus,
+.polished-overview-material .search-provider-icon:focus,
+.polished-overview-material .grid-search-result:focus,
+.polished-overview-material .list-search-result:selected,
+.polished-overview-material .search-provider-icon:selected,
+.polished-overview-material .grid-search-result:selected,
+.polished-overview-material .list-search-result:highlighted,
+.polished-overview-material .search-provider-icon:highlighted,
+.polished-overview-material .grid-search-result:highlighted,
+.polished-overview-material .list-search-result:checked,
+.polished-overview-material .search-provider-icon:checked,
+.polished-overview-material .grid-search-result:checked {
+    background-color: rgba(255, 255, 255, 0.16);
+}
+
+.polished-overview-material .list-search-result:active,
+.polished-overview-material .search-provider-icon:active,
+.polished-overview-material .grid-search-result:active {
+    background-color: rgba(255, 255, 255, 0.22);
+}
+
+.polished-overview-material .list-search-result-description {
+    color: rgba(242, 242, 242, 0.78);
+}
+
+.polished-overview-material .list-search-result:insensitive,
+.polished-overview-material .search-provider-icon:insensitive,
+.polished-overview-material .grid-search-result:insensitive {
+    background-color: transparent;
+    color: rgba(242, 242, 242, 0.4);
+}
+
+.polished-overview-material .list-search-result:insensitive .list-search-result-description,
+.polished-overview-material .search-entry:insensitive StLabel.hint-text,
+.polished-overview-material .search-entry:insensitive .search-entry-icon {
+    color: rgba(242, 242, 242, 0.4);
+}
+
+/* Shared material interaction levels: hover .12, focus/selection .16,
+ * pressed .22. Preserve native focus rings, status controls, and geometry. */
+.polished-material-dark .popup-menu-item {
+    color: #f2f2f2;
+}
+.polished-material-light .popup-menu-item {
+    color: rgb(28, 30, 40);
+}
+.polished-material-dark .popup-menu-item:hover,
+.polished-material-dark.switcher-list .item-box:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+    color: #f2f2f2;
+}
+.polished-material-dark .popup-menu-item:focus,
+.polished-material-dark .popup-menu-item:selected,
+.polished-material-dark.switcher-list .item-box:focus,
+.polished-material-dark.switcher-list .item-box:selected {
+    background-color: rgba(255, 255, 255, 0.16);
+    color: #f2f2f2;
+}
+.polished-material-dark .popup-menu-item:active,
+.polished-material-dark.switcher-list .item-box:active {
+    background-color: rgba(255, 255, 255, 0.22);
+    color: #f2f2f2;
+}
+.polished-material-light .popup-menu-item:hover {
+    background-color: rgba(28, 30, 40, 0.12);
+    color: rgb(28, 30, 40);
+}
+.polished-material-light .popup-menu-item:focus,
+.polished-material-light .popup-menu-item:selected {
+    background-color: rgba(28, 30, 40, 0.16);
+    color: rgb(28, 30, 40);
+}
+.polished-material-light .popup-menu-item:active {
+    background-color: rgba(28, 30, 40, 0.22);
+    color: rgb(28, 30, 40);
+}
+.polished-material-dark .popup-menu-item:insensitive {
+    color: rgba(242, 242, 242, 0.4);
+}
+.polished-material-light .popup-menu-item:insensitive {
+    color: rgba(28, 30, 40, 0.4);
+}
+
+/* Quiet hover, deliberate selection. Use the current GNOME accent rather than
+ * introducing a second accent. Existing keyboard-focus outlines stay native. */
+.polished-material-dark .popup-menu-item,
+.polished-material-light .popup-menu-item {
+    border-radius: 10px;
+    min-height: 24px;
+    padding: 8px 12px;
+    font-weight: 400;
+}
+.polished-material-dark .popup-menu-item:hover {
+    background-color: rgba(255,255,255,0.08);
+}
+.polished-material-light .popup-menu-item:hover {
+    background-color: rgba(28,30,40,0.08);
+}
+.polished-material-dark .popup-menu-item:focus,
+.polished-material-dark .popup-menu-item:selected,
+.polished-material-light .popup-menu-item:focus,
+.polished-material-light .popup-menu-item:selected,
+.polished-overview-material .list-search-result:focus,
+.polished-overview-material .grid-search-result:focus,
+.polished-overview-material .list-search-result:selected,
+.polished-overview-material .grid-search-result:selected {
+    background-color: st-transparentize(-st-accent-color, 0.84);
+}
+.polished-material-dark .popup-menu-item:active,
+.polished-material-light .popup-menu-item:active {
+    background-color: st-transparentize(-st-accent-color, 0.78);
+}

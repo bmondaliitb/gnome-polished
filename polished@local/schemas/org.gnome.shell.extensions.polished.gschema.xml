@@ -1,0 +1,15 @@
+<schemalist>
+ <schema id="org.gnome.shell.extensions.polished" path="/org/gnome/shell/extensions/polished/">
+  <key name="enabled" type="b"><default>true</default></key>
+  <key name="material-strength" type="i"><range min="0" max="100"/><default>50</default></key>
+  <key name="desktop-profile" type="s">
+   <default>'airy'</default>
+   <choices><choice value="subtle"/><choice value="balanced"/><choice value="airy"/><choice value="mist"/><choice value="custom"/></choices>
+   <summary>Coordinated desktop translucency</summary>
+   <description>Subtle, Balanced, Airy, and Mist use the same cached rendering with different material densities. Airy is the default. Custom exposes the full strength range.</description>
+  </key>
+  <key name="auto-comfort" type="b"><default>true</default></key>
+  <key name="appearance" type="s"><default>'auto'</default></key>
+  <key name="reduce-transparency" type="b"><default>false</default></key>
+ </schema>
+</schemalist>

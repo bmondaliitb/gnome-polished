@@ -1,0 +1,14 @@
+{
+  "uuid": "polished@local",
+  "name": "Polished Desktop",
+  "description": "Calm, coherent materials, readable foregrounds and restrained accents across the GNOME desktop.",
+  "shell-version": [
+    "50"
+  ],
+  "settings-schema": "org.gnome.shell.extensions.polished",
+  "session-modes": [
+    "user",
+    "unlock-dialog"
+  ],
+  "version": 1
+}
