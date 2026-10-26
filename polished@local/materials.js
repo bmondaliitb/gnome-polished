@@ -5,9 +5,9 @@ export const SOFT_TINT = 0.28;
 // light foregrounds even when application appearance is light.
 const PALETTES = Object.freeze({
     dark: Object.freeze({background: '25,28,35', foreground: '242,242,242',
-        edge: '255,255,255,0.20', highlight: '255,255,255'}),
+        edge: '255,255,255,0.12', activeEdge: '255,255,255,0.18', inactiveEdge: '255,255,255,0.05', highlight: '255,255,255'}),
     light: Object.freeze({background: '236,239,244', foreground: '28,30,40',
-        edge: '20,25,35,0.18', highlight: '28,30,40'}),
+        edge: '20,25,35,0.10', activeEdge: '20,25,35,0.16', inactiveEdge: '20,25,35,0.05', highlight: '28,30,40'}),
 });
 export const MATERIAL_STATES = Object.freeze({hover: 0.08, focus: 0.16, pressed: 0.22, disabled: 0.4});
 let desktopStyle = {fontStyle: '', selection: '80,140,220'};
@@ -17,8 +17,9 @@ export function surfacePalette(dark) { return {...PALETTES[dark ? 'dark' : 'ligh
 export function materialStyle(dark, {focused = true, emphasis = false} = {}) {
     const inactive = emphasis && !focused;
     const tint = SOFT_TINT + (inactive ? 0.12 : 0);
-    const color = surfacePalette(dark).background;
-    const edge = inactive ? '255,255,255,0.12' : surfacePalette(dark).edge;
+    const palette = surfacePalette(dark);
+    const color = palette.background;
+    const edge = emphasis ? (focused ? palette.activeEdge : palette.inactiveEdge) : palette.edge;
     return `background-color: rgba(${color}, ${tint}); border: 1px solid rgba(${edge});`;
 }
 

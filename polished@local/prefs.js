@@ -38,12 +38,12 @@ export default class PolishedPreferences extends ExtensionPreferences {
 
         const profileNames = [...Object.keys(DESKTOP_PROFILES), 'custom'];
         const profile = new Adw.ComboRow({title: 'Desktop translucency',
-            subtitle: 'All looks use the same low-cost cached blur.',
+            subtitle: 'Clear working windows with softly translucent menus and desktop surfaces.',
             model: Gtk.StringList.new([...Object.values(DESKTOP_PROFILES).map(value => value.label), 'Custom…'])});
         group.add(profile);
 
         const strength = new Adw.SpinRow({title: 'Material strength',
-            subtitle: 'Airy is 50. Higher values improve foreground clarity; lower values reveal more background.',
+            subtitle: 'Airy is 50. Higher values make surfaces more solid; working windows always stay nearly opaque.',
             adjustment: new Gtk.Adjustment({lower: 0, upper: 100, step_increment: 5, page_increment: 10})});
         let updatingStrength = false;
         const syncStrength = () => {

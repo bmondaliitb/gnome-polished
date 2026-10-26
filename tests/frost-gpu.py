@@ -205,9 +205,11 @@ def app_backdrop_contrast(opacity,detail):
   pixels=(C.c_ubyte*(64*64*4))();read(0,0,64,64,0x1908,0x1401,pixels)
   values.append(pixels[(32*64+32)*4])
  return values[1]-values[0]
-old_contrast=app_backdrop_contrast(0.92,0.35)
+old_contrast=app_backdrop_contrast(0.86,0.14)
 new_contrast=app_backdrop_contrast(profile['opacity'],profile['detail'])
-assert new_contrast>old_contrast*1.8 and new_contrast>=15, (old_contrast,new_contrast)
+assert 0 < new_contrast <= old_contrast*0.4, (old_contrast,new_contrast)
+# The new density must keep translucent material perceptible while greatly
+# reducing the wallpaper's influence on app content.
 print(f'{quality} opaque-app composite: backdrop contrast {old_contrast} -> {new_contrast} levels')
 contrasts={name:app_backdrop_contrast(values['opacity'],values['detail'])
            for name,values in profile['profiles'].items()}

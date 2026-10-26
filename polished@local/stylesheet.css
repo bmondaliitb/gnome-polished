@@ -1,151 +1,51 @@
-/* Search boxes share the overview's cached wallpaper blur. Keep alpha on
- * backgrounds only: labels, icons, native focus rings and geometry stay intact.
- * Scoping to our root class also covers providers/results added while typing. */
+/* Quiet surfaces. Only background paint is translucent; native keyboard-focus
+ * rings, icon sizes, grid geometry and desktop font preferences stay intact. */
 .polished-overview-material .search-section-content {
     background-color: rgba(25, 28, 35, 0.60);
     background-image: none;
-    border-color: rgba(255, 255, 255, 0.22);
+    border-color: transparent;
     color: #f2f2f2;
+    padding: 12px;
 }
 
-/* Keep the native entry outline/focus ring and folder radius/layout. These
- * surfaces reveal the same overview backdrop; no additional blur is needed. */
 .polished-overview-material .search-entry {
     background-color: rgba(25, 28, 35, 0.60);
     background-image: none;
     color: #f2f2f2;
 }
-
 .polished-overview-material .search-entry:hover {
     background-color: rgba(25, 28, 35, 0.68);
 }
-
-.polished-overview-material .search-entry:focus {
+.polished-overview-material .search-entry:focus,
+.polished-overview-material .search-entry:focus:hover {
     background-color: rgba(25, 28, 35, 0.76);
 }
-
-.polished-overview-material .search-entry:insensitive {
-    background-color: rgba(25, 28, 35, 0.48);
-    color: rgba(242, 242, 242, 0.4);
-}
-
-.polished-overview-material .search-entry StLabel.hint-text,
-.polished-overview-material .search-entry .search-entry-icon {
-    color: rgba(242, 242, 242, 0.78);
-}
-
 .polished-overview-material .app-folder-dialog {
     background-color: rgba(25, 28, 35, 0.70);
     background-image: none;
     color: #f2f2f2;
 }
 
-/* A hairline on large cards gives separation without an extra blur layer.
- * Insets follow each theme's rounded shape and leave allocations untouched.
- * Search entry focus rings and result selection outlines remain native. */
+/* One inset hairline, rather than a border plus a second bright rim. */
 .polished-overview-material .search-section-content,
 .polished-overview-material .app-folder-dialog {
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.10);
 }
-
-.polished-overview-material .list-search-result,
-.polished-overview-material .search-provider-icon,
-.polished-overview-material .grid-search-result {
-    background-color: transparent;
-    color: #f2f2f2;
-}
-
-.polished-overview-material .list-search-result:hover,
-.polished-overview-material .search-provider-icon:hover,
-.polished-overview-material .grid-search-result:hover {
-    background-color: rgba(255, 255, 255, 0.12);
-}
-
-.polished-overview-material .list-search-result:focus,
-.polished-overview-material .search-provider-icon:focus,
-.polished-overview-material .grid-search-result:focus,
-.polished-overview-material .list-search-result:selected,
-.polished-overview-material .search-provider-icon:selected,
-.polished-overview-material .grid-search-result:selected,
-.polished-overview-material .list-search-result:highlighted,
-.polished-overview-material .search-provider-icon:highlighted,
-.polished-overview-material .grid-search-result:highlighted,
-.polished-overview-material .list-search-result:checked,
-.polished-overview-material .search-provider-icon:checked,
-.polished-overview-material .grid-search-result:checked {
-    background-color: rgba(255, 255, 255, 0.16);
-}
-
-.polished-overview-material .list-search-result:active,
-.polished-overview-material .search-provider-icon:active,
-.polished-overview-material .grid-search-result:active {
-    background-color: rgba(255, 255, 255, 0.22);
-}
-
+.polished-overview-material .search-entry StLabel.hint-text,
+.polished-overview-material .search-entry .search-entry-icon,
 .polished-overview-material .list-search-result-description {
     color: rgba(242, 242, 242, 0.78);
 }
 
-.polished-overview-material .list-search-result:insensitive,
-.polished-overview-material .search-provider-icon:insensitive,
-.polished-overview-material .grid-search-result:insensitive {
-    background-color: transparent;
-    color: rgba(242, 242, 242, 0.4);
+/* An 8/12px rhythm for floating menus and result rows. Quick Settings controls, dock
+ * icons and app tiles keep native sizing; notifications keep their width. */
+.polished-material-dark.popup-menu-content,
+.polished-material-light.popup-menu-content,
+.polished-material-dark.candidate-popup-content,
+.polished-material-light.candidate-popup-content {
+    padding: 8px;
+    border-radius: 18px;
 }
-
-.polished-overview-material .list-search-result:insensitive .list-search-result-description,
-.polished-overview-material .search-entry:insensitive StLabel.hint-text,
-.polished-overview-material .search-entry:insensitive .search-entry-icon {
-    color: rgba(242, 242, 242, 0.4);
-}
-
-/* Shared material interaction levels: hover .12, focus/selection .16,
- * pressed .22. Preserve native focus rings, status controls, and geometry. */
-.polished-material-dark .popup-menu-item {
-    color: #f2f2f2;
-}
-.polished-material-light .popup-menu-item {
-    color: rgb(28, 30, 40);
-}
-.polished-material-dark .popup-menu-item:hover,
-.polished-material-dark.switcher-list .item-box:hover {
-    background-color: rgba(255, 255, 255, 0.12);
-    color: #f2f2f2;
-}
-.polished-material-dark .popup-menu-item:focus,
-.polished-material-dark .popup-menu-item:selected,
-.polished-material-dark.switcher-list .item-box:focus,
-.polished-material-dark.switcher-list .item-box:selected {
-    background-color: rgba(255, 255, 255, 0.16);
-    color: #f2f2f2;
-}
-.polished-material-dark .popup-menu-item:active,
-.polished-material-dark.switcher-list .item-box:active {
-    background-color: rgba(255, 255, 255, 0.22);
-    color: #f2f2f2;
-}
-.polished-material-light .popup-menu-item:hover {
-    background-color: rgba(28, 30, 40, 0.12);
-    color: rgb(28, 30, 40);
-}
-.polished-material-light .popup-menu-item:focus,
-.polished-material-light .popup-menu-item:selected {
-    background-color: rgba(28, 30, 40, 0.16);
-    color: rgb(28, 30, 40);
-}
-.polished-material-light .popup-menu-item:active {
-    background-color: rgba(28, 30, 40, 0.22);
-    color: rgb(28, 30, 40);
-}
-.polished-material-dark .popup-menu-item:insensitive {
-    color: rgba(242, 242, 242, 0.4);
-}
-.polished-material-light .popup-menu-item:insensitive {
-    color: rgba(28, 30, 40, 0.4);
-}
-
-/* Quiet hover, deliberate selection. Use the current GNOME accent rather than
- * introducing a second accent. Existing keyboard-focus outlines stay native. */
 .polished-material-dark .popup-menu-item,
 .polished-material-light .popup-menu-item {
     border-radius: 10px;
@@ -153,23 +53,208 @@
     padding: 8px 12px;
     font-weight: 400;
 }
-.polished-material-dark .popup-menu-item:hover {
-    background-color: rgba(255,255,255,0.08);
+.polished-overview-material .list-search-result {
+    padding: 8px 12px;
+    border-radius: 10px;
 }
-.polished-material-light .popup-menu-item:hover {
-    background-color: rgba(28,30,40,0.08);
+.polished-overview-material .list-search-results {
+    spacing: 4px;
 }
+.polished-material-dark.notification-banner .message-box,
+.polished-material-light.notification-banner .message-box {
+    padding: 8px 12px;
+    spacing: 8px;
+}
+.polished-material-dark.notification-banner .message-content,
+.polished-material-light.notification-banner .message-content {
+    spacing: 4px;
+}
+
+.polished-material-dark .popup-menu-item,
+.polished-material-dark.switcher-list .item-box,
+.polished-overview-material .list-search-result,
+.polished-overview-material .search-provider-icon,
+.polished-overview-material .grid-search-result {
+    background-color: transparent;
+    color: #f2f2f2;
+}
+
+.polished-material-dark .popup-menu-item:hover,
+.polished-material-dark.switcher-list .item-box:hover,
+.polished-overview-material .list-search-result:hover,
+.polished-overview-material .search-provider-icon:hover,
+.polished-overview-material .grid-search-result:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #f2f2f2;
+}
+
 .polished-material-dark .popup-menu-item:focus,
 .polished-material-dark .popup-menu-item:selected,
+.polished-material-dark .popup-menu-item:highlighted,
+.polished-material-dark .popup-menu-item:checked,
+.polished-material-dark .popup-menu-item:focus:hover,
+.polished-material-dark .popup-menu-item:selected:hover,
+.polished-material-dark .popup-menu-item:highlighted:hover,
+.polished-material-dark .popup-menu-item:checked:hover,
+.polished-material-dark.switcher-list .item-box:focus,
+.polished-material-dark.switcher-list .item-box:selected,
+.polished-material-dark.switcher-list .item-box:highlighted,
+.polished-material-dark.switcher-list .item-box:checked,
+.polished-material-dark.switcher-list .item-box:focus:hover,
+.polished-material-dark.switcher-list .item-box:selected:hover,
+.polished-material-dark.switcher-list .item-box:highlighted:hover,
+.polished-material-dark.switcher-list .item-box:checked:hover,
+.polished-overview-material .list-search-result:focus,
+.polished-overview-material .list-search-result:selected,
+.polished-overview-material .list-search-result:highlighted,
+.polished-overview-material .list-search-result:checked,
+.polished-overview-material .list-search-result:focus:hover,
+.polished-overview-material .list-search-result:selected:hover,
+.polished-overview-material .list-search-result:highlighted:hover,
+.polished-overview-material .list-search-result:checked:hover,
+.polished-overview-material .search-provider-icon:focus,
+.polished-overview-material .search-provider-icon:selected,
+.polished-overview-material .search-provider-icon:highlighted,
+.polished-overview-material .search-provider-icon:checked,
+.polished-overview-material .search-provider-icon:focus:hover,
+.polished-overview-material .search-provider-icon:selected:hover,
+.polished-overview-material .search-provider-icon:highlighted:hover,
+.polished-overview-material .search-provider-icon:checked:hover,
+.polished-overview-material .grid-search-result:focus,
+.polished-overview-material .grid-search-result:selected,
+.polished-overview-material .grid-search-result:highlighted,
+.polished-overview-material .grid-search-result:checked,
+.polished-overview-material .grid-search-result:focus:hover,
+.polished-overview-material .grid-search-result:selected:hover,
+.polished-overview-material .grid-search-result:highlighted:hover,
+.polished-overview-material .grid-search-result:checked:hover {
+    background-color: st-transparentize(-st-accent-color, 0.84);
+    color: #f2f2f2;
+}
+
+.polished-material-dark .popup-menu-item:active,
+.polished-material-dark .popup-menu-item:active:hover,
+.polished-material-dark .popup-menu-item:active:focus,
+.polished-material-dark .popup-menu-item:active:selected,
+.polished-material-dark .popup-menu-item:active:highlighted,
+.polished-material-dark .popup-menu-item:active:checked,
+.polished-material-dark.switcher-list .item-box:active,
+.polished-material-dark.switcher-list .item-box:active:hover,
+.polished-material-dark.switcher-list .item-box:active:focus,
+.polished-material-dark.switcher-list .item-box:active:selected,
+.polished-material-dark.switcher-list .item-box:active:highlighted,
+.polished-material-dark.switcher-list .item-box:active:checked,
+.polished-overview-material .list-search-result:active,
+.polished-overview-material .list-search-result:active:hover,
+.polished-overview-material .list-search-result:active:focus,
+.polished-overview-material .list-search-result:active:selected,
+.polished-overview-material .list-search-result:active:highlighted,
+.polished-overview-material .list-search-result:active:checked,
+.polished-overview-material .search-provider-icon:active,
+.polished-overview-material .search-provider-icon:active:hover,
+.polished-overview-material .search-provider-icon:active:focus,
+.polished-overview-material .search-provider-icon:active:selected,
+.polished-overview-material .search-provider-icon:active:highlighted,
+.polished-overview-material .search-provider-icon:active:checked,
+.polished-overview-material .grid-search-result:active,
+.polished-overview-material .grid-search-result:active:hover,
+.polished-overview-material .grid-search-result:active:focus,
+.polished-overview-material .grid-search-result:active:selected,
+.polished-overview-material .grid-search-result:active:highlighted,
+.polished-overview-material .grid-search-result:active:checked {
+    background-color: st-transparentize(-st-accent-color, 0.78);
+    color: #f2f2f2;
+}
+
+.polished-material-dark .popup-menu-item:insensitive,
+.polished-material-dark .popup-menu-item:insensitive:hover,
+.polished-material-dark .popup-menu-item:insensitive:focus,
+.polished-material-dark .popup-menu-item:insensitive:active,
+.polished-material-dark .popup-menu-item:insensitive:selected,
+.polished-material-dark .popup-menu-item:insensitive:checked,
+.polished-material-dark .popup-menu-item:insensitive:highlighted,
+.polished-material-dark.switcher-list .item-box:insensitive,
+.polished-material-dark.switcher-list .item-box:insensitive:hover,
+.polished-material-dark.switcher-list .item-box:insensitive:focus,
+.polished-material-dark.switcher-list .item-box:insensitive:active,
+.polished-material-dark.switcher-list .item-box:insensitive:selected,
+.polished-material-dark.switcher-list .item-box:insensitive:checked,
+.polished-material-dark.switcher-list .item-box:insensitive:highlighted,
+.polished-overview-material .list-search-result:insensitive,
+.polished-overview-material .list-search-result:insensitive:hover,
+.polished-overview-material .list-search-result:insensitive:focus,
+.polished-overview-material .list-search-result:insensitive:active,
+.polished-overview-material .list-search-result:insensitive:selected,
+.polished-overview-material .list-search-result:insensitive:checked,
+.polished-overview-material .list-search-result:insensitive:highlighted,
+.polished-overview-material .search-provider-icon:insensitive,
+.polished-overview-material .search-provider-icon:insensitive:hover,
+.polished-overview-material .search-provider-icon:insensitive:focus,
+.polished-overview-material .search-provider-icon:insensitive:active,
+.polished-overview-material .search-provider-icon:insensitive:selected,
+.polished-overview-material .search-provider-icon:insensitive:checked,
+.polished-overview-material .search-provider-icon:insensitive:highlighted,
+.polished-overview-material .grid-search-result:insensitive,
+.polished-overview-material .grid-search-result:insensitive:hover,
+.polished-overview-material .grid-search-result:insensitive:focus,
+.polished-overview-material .grid-search-result:insensitive:active,
+.polished-overview-material .grid-search-result:insensitive:selected,
+.polished-overview-material .grid-search-result:insensitive:checked,
+.polished-overview-material .grid-search-result:insensitive:highlighted {
+    background-color: transparent;
+    color: rgba(242, 242, 242, 0.4);
+}
+
+.polished-material-light .popup-menu-item {
+    background-color: transparent;
+    color: rgb(28, 30, 40);
+}
+
+.polished-material-light .popup-menu-item:hover {
+    background-color: rgba(28, 30, 40, 0.08);
+    color: rgb(28, 30, 40);
+}
+
 .polished-material-light .popup-menu-item:focus,
 .polished-material-light .popup-menu-item:selected,
-.polished-overview-material .list-search-result:focus,
-.polished-overview-material .grid-search-result:focus,
-.polished-overview-material .list-search-result:selected,
-.polished-overview-material .grid-search-result:selected {
+.polished-material-light .popup-menu-item:highlighted,
+.polished-material-light .popup-menu-item:checked,
+.polished-material-light .popup-menu-item:focus:hover,
+.polished-material-light .popup-menu-item:selected:hover,
+.polished-material-light .popup-menu-item:highlighted:hover,
+.polished-material-light .popup-menu-item:checked:hover {
     background-color: st-transparentize(-st-accent-color, 0.84);
+    color: rgb(28, 30, 40);
 }
-.polished-material-dark .popup-menu-item:active,
-.polished-material-light .popup-menu-item:active {
+
+.polished-material-light .popup-menu-item:active,
+.polished-material-light .popup-menu-item:active:hover,
+.polished-material-light .popup-menu-item:active:focus,
+.polished-material-light .popup-menu-item:active:selected,
+.polished-material-light .popup-menu-item:active:highlighted,
+.polished-material-light .popup-menu-item:active:checked {
     background-color: st-transparentize(-st-accent-color, 0.78);
+    color: rgb(28, 30, 40);
+}
+
+.polished-material-light .popup-menu-item:insensitive,
+.polished-material-light .popup-menu-item:insensitive:hover,
+.polished-material-light .popup-menu-item:insensitive:focus,
+.polished-material-light .popup-menu-item:insensitive:active,
+.polished-material-light .popup-menu-item:insensitive:selected,
+.polished-material-light .popup-menu-item:insensitive:checked,
+.polished-material-light .popup-menu-item:insensitive:highlighted {
+    background-color: transparent;
+    color: rgba(28, 30, 40, 0.4);
+}
+
+.polished-overview-material .search-entry:insensitive,
+.polished-overview-material .search-entry:insensitive:hover {
+    background-color: rgba(25, 28, 35, 0.48);
+    color: rgba(242, 242, 242, 0.4);
+}
+.polished-overview-material .list-search-result:insensitive .list-search-result-description,
+.polished-overview-material .search-entry:insensitive StLabel.hint-text,
+.polished-overview-material .search-entry:insensitive .search-entry-icon {
+    color: rgba(242, 242, 242, 0.4);
 }

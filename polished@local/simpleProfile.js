@@ -9,7 +9,8 @@ export function materialValues(strength) {
     const value = Math.max(0, Math.min(100, Math.round(strength)));
     const density = value < 50 ? -100 + value * 2.4 : 20 + (value - 50) * 1.6;
     return {
-        windowOpacity: Math.round(80 + value * 0.12),
+        // Keep working content nearly opaque; floating materials carry the glass.
+        windowOpacity: Math.round(92 + value * 0.08),
         detail: Math.max(0, Math.round(10 + density * 0.20)),
         popupOpacity: Math.round(86 + density * 0.12),
         shellOpacity: Math.round(70 + density * 0.30),

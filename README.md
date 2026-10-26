@@ -4,10 +4,10 @@ A separate GNOME Shell **50** extension, UUID `polished@local`, for a calmer, co
 
 ## The look
 
-- **Clear foregrounds:** Airy is the default, with 86% client opacity rather than Prism's 79%. Background windows use at least 94%; dialogs at least 96%. This limits background competition and preserves more text contrast. Custom spans 80–92% focused-client opacity.
-- **Gentle separation:** one-pixel translucent rims above app clients, quieter inactive edges, soft menu/card shadows and a rounded dock rim. Window shadows remain Mutter's native shadows. Decorative actors never pick or handle input.
+- **Clear foregrounds:** Airy is the default, with 96% client opacity to keep working content nearly opaque. Background windows use at least 98%; dialogs at least 99%. This limits background competition and preserves more text contrast. Custom spans 92–100% focused-client opacity.
+- **Gentle separation:** a subtle active-window rim, much quieter inactive edges, faint surface hairlines, soft menu/card shadows and a rounded dock rim. Window shadows remain Mutter's native shadows. Decorative actors never pick or handle input.
 - **Coordinated color:** neutral light/dark surfaces, quiet hover states, restrained accent selection in GTK4 menus, and the native theme accent for Shell selection. The wallpaper remains the user's own source of background color. Top-bar foreground contrast follows wallpaper brightness.
-- **Typography and spacing:** material menus and overview follow the desktop font, including size and absolute pixel units. Floating menu rows have consistent padding and rounded highlights. App typography and internal layouts remain native.
+- **Typography and spacing:** material menus and overview follow the desktop font, including size and absolute pixel units. Shell and GTK menu rows share 8×12 px padding and 10 px rounded highlights; overview list rows follow the same rhythm, with coordinated notification spacing. Hover, selection and pressed states follow the same quiet hierarchy across menus, overview and the window switcher. App typography and internal layouts remain native.
 - **Smooth interaction:** cached backdrop blur, progressive downsampling, a bounded reduced-image filter, no live blur timer, frozen snapshots while dragging/resizing and during workspace transitions. Native GNOME animation and keyboard-focus behavior are retained.
 
 Supported surfaces include normal windows, separate app popups/dialogs, GNOME menus, notifications, dock backgrounds, overview search/folder cards and the session lock screen. GTK4 context menus get a managed stylesheet block. Unknown native shapes fall back to tint rather than rectangular blur. High contrast, Reduce transparency and Power Saver behavior are preserved. The system login greeter is outside this project.
@@ -58,13 +58,3 @@ This restores owned styles, original client opacity, native effects and GTK rule
 ```sh
 gnome-extensions enable prism@local
 ```
-
-## Source placement in this session
-
-The requested sibling directory `../gnome-polished` was read-only under the session filesystem policy. This complete standalone project is staged at `gnome-material/gnome-polished`. From `gnome-material`, copy it into the requested folder with:
-
-```sh
-cp -a gnome-polished/. ../gnome-polished/
-```
-
-Then run the install commands from that sibling folder.

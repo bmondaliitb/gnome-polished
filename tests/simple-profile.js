@@ -7,9 +7,10 @@ const settings=memorySettings();
 assert(settings.settings_schema.list_keys().length===6,'Only six current settings remain');
 initializeProfile(settings);
 assert(settings.get_string('desktop-profile')==='airy'&&settings.get_int('material-strength')===50,'Independent comfort default');
-assert(materialValues(50).windowOpacity===86,'Default keeps text clearer than whole-window 79%');
+assert(materialValues(50).windowOpacity===96,'Default keeps working text nearly opaque');
 settings.set_boolean('enabled',false);settings.set_boolean('reduce-transparency',true);settings.set_string('appearance','dark');
-const defaults={opacity:.86,detail:.14,tint:SOFT_TINT,profiles:{}};
+const current=materialValues(50);
+const defaults={opacity:current.windowOpacity/100,detail:current.detail/100,tint:SOFT_TINT,profiles:{}};
 let previous=101;
 for(const id of ['subtle','balanced','airy','mist']){
     applyDesktopProfile(settings,id);
@@ -21,7 +22,7 @@ assert(Object.keys(DESKTOP_PROFILES).length===4,'No retired or unused presets');
 previous=0;
 for(let i=0;i<=100;i++){
     applyStrength(settings,i);const v=materialValues(i);
-    assert(v.windowOpacity>=previous&&v.windowOpacity>=80&&v.windowOpacity<=92,'Custom preserves foreground clarity');
+    assert(v.windowOpacity>=previous&&v.windowOpacity>=92&&v.windowOpacity<=100,'Custom preserves foreground clarity');
     previous=v.windowOpacity;
 }
 applyStrength(settings,17);initializeProfile(settings);

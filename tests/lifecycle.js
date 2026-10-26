@@ -39,14 +39,22 @@ const actor={effects:[],get_children:()=>[decoration,surface],insert_child_at_in
     add_effect(effect){this.effects.push(effect);},remove_effect(effect){this.effects=this.effects.filter(item=>item!==effect);}};
 const state={actor,window:win};
 extension._update(actor,state);
-assert(surface.opacity===206&&decoration.opacity===255,'Airy applies to the actual native client without app selection');
+assert(surface.opacity===230&&decoration.opacity===255,'Airy applies to the actual native client without app selection');
+assert(state.rim.style.includes(surfacePalette(true).activeEdge), 'Focused windows get the shared active edge');
 assert(state.rim===actor.rim&&!state.rim.effect&&!state.rim.properties.reactive, 'Visible window rim never captures or intercepts input');
 assert(state.layer.position.join()==='5,5'&&state.layer.size.join()==='500,400','Frame/buffer/shadow bounds remain correct');
 assert(state.effect.radii.join()==='12,12,12,12'&&state.effect.veil[3]===0.14,'Native-corner-safe backdrop and density are retained');
 assert(!state.layer.properties.reactive&&!state.layer.properties.can_focus&&!state.layer.properties.track_hover,'Decorative material cannot intercept input');
 assert(actor.effects.length===1&&state.effect.invalidations===1,'First capture has redraw/culling protection and explicit invalidation');
 extension._update(actor,state);
-assert(surface.opacity===206&&state.effect.invalidations===1&&state.layer.redraws===1,'Repeated refresh neither fades cumulatively nor recaptures a snapshot');
+assert(surface.opacity===230&&state.effect.invalidations===1&&state.layer.redraws===1,'Repeated refresh neither fades cumulatively nor recaptures a snapshot');
+const focusedLayer=state.layer;
+display.focus_window=null;extension._update(actor,state);
+assert(state.layer===focusedLayer&&surface.opacity===235&&state.rim.style.includes(surfacePalette(true).inactiveEdge),
+    'Losing focus quiets the edge and backdrop without replacing the cached layer');
+display.focus_window=win;extension._update(actor,state);
+assert(state.layer===focusedLayer&&surface.opacity===230&&state.rim.style.includes(surfacePalette(true).activeEdge),
+    'Returning focus restores emphasis and clarity without cumulative fading');
 extension._settings.set_boolean('enabled',false);extension._update(actor,state);
 assert(state.rim===null,'Master off removes the foreground rim');
 assert(state.layer===null&&surface.opacity===240&&actor.effects.length===0,'Master off restores opacity and removes all effects');
@@ -62,21 +70,22 @@ extension._update(actor,state);assert(!state.layer,'System high contrast retains
 extension._experience.state={onBattery:true,powerSaver:false};
 const background={actor,window:{...win}};
 extension._update(actor,background);
-assert(background.effect&&surface.opacity===226,'Battery retains cached material on background windows');
+assert(background.effect&&surface.opacity===235,'Battery retains cached material on background windows');
+assert(background.rim.style.includes(surfacePalette(true).inactiveEdge), 'Background windows get a quieter edge');
 extension._clear(background);
 extension._experience.state.powerSaver=true;
 extension._update(actor,background);
-assert(background.layer&&!background.effect&&surface.opacity===226&&actor.effects.length===0,'Power Saver retains background tint without capture/culling guard');
+assert(background.layer&&!background.effect&&surface.opacity===235&&actor.effects.length===0,'Power Saver retains background tint without capture/culling guard');
 extension._clear(background);
 extension._update(actor,state);assert(state.effect,'Focused window retains frost in Power Saver');extension._clear(state);
 extension._experience.state={};
 windowType=6;extension._update(actor,state);
-assert(state.effect&&surface.opacity===230,'Dialogs remain enabled with stronger native-content opacity');extension._clear(state);
+assert(state.effect&&surface.opacity===238,'Dialogs remain enabled with stronger native-content opacity');extension._clear(state);
 windowType=3;extension._update(actor,state);
 assert(!state.layer&&state.popupEffect.nativeShape&&surface.opacity===240&&state.popupEffect.clientTintOpacity===0.88,
     'Separate app popups preserve their native silhouette and opaque text');extension._clear(state);
 windowType=0;extension._settings.set_int('material-strength',0);extension._update(actor,state);
-assert(surface.opacity===192,'Expanded Custom range reaches real client opacity without legacy clamps');extension._clear(state);
+assert(surface.opacity===221,'Custom retains at least 92% client clarity');extension._clear(state);
 extension._settings.set_int('material-strength',50);
 let writes=0;extension._gtkMenus={apply:()=>writes++};extension._syncGtkMenus();extension._syncGtkMenus();
 assert(writes===1,'Unchanged GTK material performs no repeated stylesheet IO');
@@ -91,9 +100,9 @@ extension._settings.set_int('material-strength',50);extension._update(actor,stat
 const layer=state.layer;
 main.wm._workspaceAnimation._switchData={};extension._syncWorkspaceMotion();
 extension._settings.set_int('material-strength',0);extension._update(actor,state);
-assert(suspended&&paused&&state.layer===layer&&surface.opacity===206,'Workspace motion freezes materials and suspends broad redraw protection');
+assert(suspended&&paused&&state.layer===layer&&surface.opacity===230,'Workspace motion freezes materials and suspends broad redraw protection');
 main.wm._workspaceAnimation._switchData=null;extension._syncWorkspaceMotion();extension._refresh();
-assert(!suspended&&!paused&&state.layer===layer&&surface.opacity===192,'Motion completion applies deferred density without rebuilding the backdrop');
+assert(!suspended&&!paused&&state.layer===layer&&surface.opacity===221,'Motion completion applies deferred density without rebuilding the backdrop');
 extension._clear(state);
 assert(surface.opacity===240&&surface.effects.length===0&&actor.effects.length===0,'Final cleanup releases popup and window effects');
 print('Unified window/popup lifecycle, cached focus, Power Saver, density, GTK IO and workspace checks passed');
@@ -117,7 +126,7 @@ class Switch {connect(){return 1;}setToggleState(){}}
 class Lifetime {destroy(){this.destroyed=true;}refresh(){}setMotionPaused(){}}
 class Surfaces extends Lifetime {
     constructor(root,panel,isDark,permitted,guard,context){super();
-        assert(typeof isDark==='function'&&typeof permitted==='function'&&context().windowOpacity===86,
+        assert(typeof isDark==='function'&&typeof permitted==='function'&&context().windowOpacity===96,
             'Shell manager receives the derived context and new constructor arguments');}
 }
 class Overview extends Lifetime {

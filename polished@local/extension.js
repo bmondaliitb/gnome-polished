@@ -196,7 +196,8 @@ export default class Polished extends Extension {
             Meta.WindowType.UTILITY, Meta.WindowType.TOOLBAR].includes(type);
         const parent = w.get_transient_for?.();
         const context = this._context();
-        const focused = global.display.focus_window === w || global.display.focus_window === parent;
+        const focused = global.display.focus_window === w ||
+            Boolean(parent && global.display.focus_window === parent);
         const active = s.get_boolean('enabled') && !this._reduced() &&
             !Main.overview.visible && !Main.sessionMode.isLocked && eligible({
                 normal: type === Meta.WindowType.NORMAL || isPopup || isDialog,
@@ -246,8 +247,8 @@ export default class Polished extends Extension {
             }
             state.rim.set_position(frame.x - buffer.x, frame.y - buffer.y);
             state.rim.set_size(frame.width, frame.height);
-            const edge = focused ? surfacePalette(dark).edge
-                : dark ? '255,255,255,0.10' : '20,25,35,0.10';
+            const palette = surfacePalette(dark);
+            const edge = focused ? palette.activeEdge : palette.inactiveEdge;
             const rimStyle = `background-color: transparent; border: 1px solid rgba(${edge}); border-radius: ${radius}px;`;
             if (state.rimStyle !== rimStyle) {
                 state.rim.set_style(rimStyle);
@@ -314,8 +315,8 @@ export default class Polished extends Extension {
         }
         this._redrawGuard?.track(state.layer ?? state.surface, hasFrost);
         let opacity = isPopup ? context.popupOpacity : context.windowOpacity;
-        if (isDialog) opacity = Math.max(96, opacity);
-        else if (!isPopup && !focused) opacity = Math.max(94, opacity);
+        if (isDialog) opacity = Math.max(99, opacity);
+        else if (!isPopup && !focused) opacity = Math.max(98, opacity);
         // Native popup frost composites the translucent fill against the blur.
         // Fading the entire client afterwards leaks sharp background text back
         // through it. In this mode opacity controls the native fill in GLSL.

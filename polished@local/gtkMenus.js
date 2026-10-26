@@ -37,7 +37,7 @@ export function gtkMenuCss(dark, opacity) {
     border: 1px solid rgba(${palette.edge});
     border-radius: 18px;
     padding: 8px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.24);
+    box-shadow: 0 6px 18px rgba(0,0,0,${dark ? 0.24 : 0.14});
   }
   popover.menu.background > arrow {
     background-color: rgba(${bg},${alpha}); background-image: none;
@@ -49,7 +49,7 @@ export function gtkMenuCss(dark, opacity) {
     background-color: transparent; background-image: none;
   }
   ${item} {
-    border-radius: 12px; min-height: 32px; padding: 6px 12px;
+    border-radius: 10px; min-height: 24px; padding: 8px 12px;
     background-image: none; color: rgb(${fg});
   }
   ${state(':hover')} {
