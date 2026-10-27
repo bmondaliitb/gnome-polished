@@ -154,11 +154,26 @@ quiet=render(24)
 assert spread(quiet)<spread(text_soft)*0.65+0.5, 'Detail reduction must further suppress backdrop contrast'
 set4(loc(program,b'sourceColor'),1,(F*4)(1,1,1,1))
 assert render(24)[(32*64+32)*4:(32*64+32)*4+4]==[255,255,255,255], 'Detail reduction must not alter opaque foreground text'
+# Shell widgets have transparent allocation margins and offscreen shadow
+# padding. The old rounded-allocation mode filled those otherwise empty pixels
+# with an opaque backdrop plate, visible as an extra frame behind the popup.
+set4(loc(program,b'sourceColor'),1,(F*4)(0,0,0,0))
+uniform1(loc(program,b'polishedNativeShape'),0)
+allocation_fill=render(24)
+assert allocation_fill[(32*64+32)*4+3]==255, 'Regression fixture must expose the old filled-padding behavior'
 uniform1(loc(program,b'polishedNativeShape'),1)
 uniform1(loc(program,b'polishedNativeTintOpacity'),0.8)
 set4(loc(program,b'sourceColor'),1,(F*4)(0,0,0,0))
 native_empty=render(24)
 assert all(value==0 for value in native_empty), 'Native popup margins must stay completely transparent with no backdrop plate'
+# Shadow textures can be taller than the actor and offset asymmetrically.
+# Native coverage must preserve blank paint even when the synthetic rectangle
+# would lie underneath a transparent part of that offscreen texture.
+bind(G,'glUniform2f',None,I,F,F)(loc(program,b'polishedTexSize'),96,112)
+bind(G,'glUniform2f',None,I,F,F)(loc(program,b'polishedPadding'),16,24)
+assert all(value==0 for value in render(24)), 'Offscreen shadow padding must remain transparent at expanded texture bounds'
+bind(G,'glUniform2f',None,I,F,F)(loc(program,b'polishedTexSize'),64,64)
+bind(G,'glUniform2f',None,I,F,F)(loc(program,b'polishedPadding'),0,0)
 set4(loc(program,b'sourceColor'),1,(F*4)(0,0,0,0.1))
 native_shadow=render(24)
 assert abs(native_shadow[(32*64+32)*4+3]-26)<=1, 'Native low-alpha shadow must not fill with frost'

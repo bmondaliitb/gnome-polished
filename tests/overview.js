@@ -66,18 +66,34 @@ context = {...context, overviewOpacity: 10}; material.refresh();
 assert(material._tint.style.includes('0.1') && controls.style === null && controls.opacity === 255,
     'Changing veil opacity leaves search/app controls unchanged');
 assert([...material._records.values()].every(record => record.effect), 'Density changes reuse wallpaper blur');
+context.smoothPerformance=true;material.refresh();
+assert(!material._layer&&!material._tint&&material._managers.length===0&&material._records.size===0&&destroyed===2,
+    'Smooth overview destroys duplicate wallpaper, tint and blur resources');
+assert(created===2&&root.has_style_class_name('polished-overview-material')&&root.has_style_class_name('polished-overview-smooth'),
+    'Smooth overview keeps refined search styling without creating wallpaper managers');
+material.refresh();root.visible=false;root.emit('notify::visible');root.visible=true;root.emit('notify::visible');
 layout.emit('monitors-changed');
-assert(created === 4 && destroyed === 2, 'Monitor changes rebuild owned wallpaper resources');
+assert(created===2&&root.children.length===1&&root.children[0]===controls&&
+    !root.style.includes('background-color: transparent'),
+    'Smooth show/hide and monitor changes keep native overview rendering with no extra layers');
+context.smoothPerformance=false;material.refresh();
+assert(!root.has_style_class_name('polished-overview-smooth')&&[...material._records].every(([actor,record])=>record.effect&&actor.effects.length===1),
+    'Restoring glass reinstates exactly one overview effect per monitor');
+layout.emit('monitors-changed');
+assert(created === 6 && destroyed === 4, 'Monitor changes rebuild only glass-mode wallpaper resources');
+context.smoothPerformance=true;material.refresh();
 permitted = false; material.refresh();
+assert(!root.has_style_class_name('polished-overview-smooth'),'Accessibility removes the owned smooth appearance class');
 assert(!root.has_style_class_name('polished-overview-material'), 'Accessibility/disable restores native search backgrounds');
 assert(root.style === 'background-color: #222222;' && root.children.length === 1 && root.children[0] === controls,
     'Accessibility/disable restores the original background and native controls');
 material.destroy();
-assert(root.signals.size === 0 && layout.signals.size === 0 && destroyed === 4, 'Disable disconnects signals and destroys every wallpaper manager');
+assert(root.signals.size === 0 && layout.signals.size === 0 && destroyed === 6, 'Disable disconnects signals and destroys every wallpaper manager');
 const root2 = new Actor({visible: true});
 root2.add_style_class_name('polished-overview-material');
+root2.add_style_class_name('polished-overview-smooth');
 const layout2 = new Actor({overviewGroup: root2, monitors: []});
 const material2 = new Material(layout2, () => true, () => context);
 material2.destroy();
-assert(root2.has_style_class_name('polished-overview-material'), 'Cleanup preserves a preexisting external scope class');
+assert(root2.has_style_class_name('polished-overview-material')&&root2.has_style_class_name('polished-overview-smooth'), 'Cleanup preserves a preexisting external scope class');
 print('Overview material layering, cached blur, monitor lifecycle, opacity, and restoration checks passed');

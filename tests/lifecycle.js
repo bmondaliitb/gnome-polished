@@ -10,7 +10,7 @@ const source='const ExtensionState={ACTIVE:1,ACTIVATING:8};\n'+new TextDecoder()
 class Widget {
     constructor(properties){this.properties=properties;this.redraws=0;}
     add_effect(effect){this.effect=effect;}
-    set_position(x,y){this.position=[x,y];} set_size(w,h){this.size=[w,h];}
+    set_position(x,y){this.position=[x,y];this.positionWrites=(this.positionWrites??0)+1;} set_size(w,h){this.size=[w,h];this.sizeWrites=(this.sizeWrites??0)+1;}
     set_style(style){this.style=style;} queue_redraw(){this.redraws++;}
     destroy(){this.destroyed=true;}
 }
@@ -31,6 +31,8 @@ const Polished=new Function('Extension','Gio','Meta','St','Main','global','eligi
     source+'\nreturn Polished;')(class{},{},{WindowType:types},{},main,{display},eligible,materialStyle,MockFrost,
     {type_name_from_instance:actor=>actor.constructor.$gtype},clientSurfaceRoot,Widget,class{},(dark,alpha)=>dark+':'+alpha,comfortPolicy,materialValues,surfacePalette);
 const extension=new Polished();extension._settings=memorySettings();initializeProfile(extension._settings);
+extension._settings.set_boolean('smooth-performance',false);
+extension._motionSignal=1; // Isolated window tests simulate the glass observer.
 extension._interface={get_string:()=> 'prefer-dark'};
 const surface={opacity:240,effects:[],constructor:{$gtype:'MetaSurfaceContainerActorWayland'},
     add_effect(effect){this.effects.push(effect);},remove_effect(effect){this.effects=this.effects.filter(item=>item!==effect);}};
@@ -70,14 +72,22 @@ extension._update(actor,state);assert(!state.layer,'System high contrast retains
 extension._experience.state={onBattery:true,powerSaver:false};
 const background={actor,window:{...win}};
 extension._update(actor,background);
-assert(background.effect&&surface.opacity===235,'Battery retains cached material on background windows');
+assert(!background.effect&&!background.layer&&surface.opacity===240,'Battery keeps app windows native and removes full-window glass');
 assert(background.rim.style.includes(surfacePalette(true).inactiveEdge), 'Background windows get a quieter edge');
 extension._clear(background);
 extension._experience.state.powerSaver=true;
 extension._update(actor,background);
-assert(background.layer&&!background.effect&&surface.opacity===235&&actor.effects.length===0,'Power Saver retains background tint without capture/culling guard');
+assert(!background.layer&&!background.effect&&surface.opacity===240&&actor.effects.length===0,'Power Saver avoids full-window effects and fading');
 extension._clear(background);
-extension._update(actor,state);assert(state.effect,'Focused window retains frost in Power Saver');extension._clear(state);
+extension._update(actor,state);assert(!state.effect&&surface.opacity===240,'Power Saver also removes focused-window glass by default');extension._clear(state);
+extension._settings.set_boolean('battery-window-glass',true);extension._update(actor,state);
+assert(state.effect,'Battery app-window glass can be enabled independently');extension._clear(state);
+extension._settings.set_boolean('battery-window-glass',false);
+windowType=3;extension._update(actor,state);
+assert(state.popupEffect&&surface.opacity===240,'Battery still preserves native-shaped glass menus by default');extension._clear(state);
+extension._settings.set_boolean('battery-menu-glass',false);extension._update(actor,state);
+assert(!state.popupEffect&&surface.opacity===240,'Battery menu glass can also be turned off');extension._clear(state);
+extension._settings.set_boolean('battery-menu-glass',true);windowType=0;
 extension._experience.state={};
 windowType=6;extension._update(actor,state);
 assert(state.effect&&surface.opacity===238,'Dialogs remain enabled with stronger native-content opacity');extension._clear(state);
@@ -105,6 +115,51 @@ main.wm._workspaceAnimation._switchData=null;extension._syncWorkspaceMotion();ex
 assert(!suspended&&!paused&&state.layer===layer&&surface.opacity===221,'Motion completion applies deferred density without rebuilding the backdrop');
 extension._clear(state);
 assert(surface.opacity===240&&surface.effects.length===0&&actor.effects.length===0,'Final cleanup releases popup and window effects');
+// Switch live between glass and smooth rendering, including existing popups.
+extension._settings.set_int('material-strength',50);
+extension._update(actor,state);
+const glassRim=state.rim, glassLayer=state.layer;
+extension._settings.set_boolean('smooth-performance',true);
+extension._update(actor,state);
+assert(!state.layer&&!state.effect&&!state.refreshEffect&&actor.effects.length===0&&surface.opacity===240,
+    'Smooth mode restores original native opacity and removes window backdrop/culling effects');
+assert(glassLayer.destroyed&&state.rim===glassRim&&!glassRim.destroyed,
+    'Switching to smooth mode keeps the existing lightweight focus rim');
+extension._update(actor,state);
+assert(state.rim===glassRim&&surface.opacity===240,'Smooth refresh reuses the rim without fading the client');
+display.focus_window=null;extension._update(actor,state);
+assert(state.rim===glassRim&&state.rim.style.includes(surfacePalette(true).inactiveEdge),
+    'Smooth mode keeps quiet focus feedback with original client opacity');
+display.focus_window=win;
+windowType=3;extension._settings.set_boolean('smooth-performance',false);extension._update(actor,state);
+assert(state.popupEffect&&surface.effects.length===1,'Glass popup is active before a live mode change');
+extension._settings.set_boolean('smooth-performance',true);extension._update(actor,state);
+assert(!state.rim&&!state.popupEffect&&surface.effects.length===0&&surface.opacity===240,
+    'Smooth native popups keep their original silhouette, opacity and effect chain');
+windowType=0;extension._update(actor,state);
+extension._syncGtkMenus();assert(extension._gtkCss==='true:94','Smooth GTK menus use a readable dense fill');
+extension._settings.set_boolean('smooth-performance',false);extension._update(actor,state);
+assert(state.effect&&state.refreshEffect&&surface.opacity===230,'Glass mode can be restored live');
+extension._clear(state);
+extension._settings.set_boolean('smooth-performance',true);extension._update(actor,state);
+const steadyRim=state.rim,geometryWrites=steadyRim.positionWrites+steadyRim.sizeWrites;
+main.overview.visible=true;extension._update(actor,state);
+main.overview.visible=false;extension._update(actor,state);
+assert(state.rim===steadyRim&&!steadyRim.destroyed&&steadyRim.positionWrites+steadyRim.sizeWrites===geometryWrites,
+    'Smooth overview transitions retain window rims without recreation or geometry writes');
+let focusUpdates=0;
+const originalUpdate=extension._update;
+extension._windows=new Map([[actor,state],[{}, {window:{get_transient_for:()=>null},cachedFocus:false}]]);
+extension._update=(...args)=>{focusUpdates++;originalUpdate.apply(extension,args);};
+extension._refreshFocus();assert(focusUpdates===0,'Unchanged focus does not refresh any window');
+display.focus_window=null;extension._refreshFocus();
+assert(focusUpdates===1&&state.rim===steadyRim,'Focus loss updates just the old focus family');
+extension._refreshFocus();assert(focusUpdates===1,'Repeated focus notifications do not repeat rendering work');
+display.focus_window=win;extension._refreshFocus();assert(focusUpdates===2,'Focus return updates just the new focus family');
+extension._update=originalUpdate;extension._windows.clear();
+extension._settings.set_boolean('reduce-transparency',true);extension._update(actor,state);
+assert(!state.rim&&surface.opacity===240,'Reduce transparency still restores the native appearance in smooth mode');
+extension._settings.set_boolean('reduce-transparency',false);
 print('Unified window/popup lifecycle, cached focus, Power Saver, density, GTK IO and workspace checks passed');
 
 // Exercise enable/disable wiring too: constructor argument changes must not
@@ -126,7 +181,7 @@ class Switch {connect(){return 1;}setToggleState(){}}
 class Lifetime {destroy(){this.destroyed=true;}refresh(){}setMotionPaused(){}}
 class Surfaces extends Lifetime {
     constructor(root,panel,isDark,permitted,guard,context){super();
-        assert(typeof isDark==='function'&&typeof permitted==='function'&&context().windowOpacity===96,
+        assert(typeof isDark==='function'&&typeof permitted==='function'&&context().windowOpacity===96&&context().smoothPerformance,
             'Shell manager receives the derived context and new constructor arguments');}
 }
 class Overview extends Lifetime {
@@ -135,18 +190,53 @@ class Overview extends Lifetime {
 class Lock extends Lifetime {
     constructor(shield,permitted){super();assert(typeof permitted==='function','Lock constructor wiring');}
 }
+const bindings=new Map();let layoutCalls=0;
 const bootMain={overview,sessionMode:session,wm:{_workspaceAnimation:{_switchData:null}},uiGroup:{},screenShield:{},
     layoutManager:{},panel:{addToStatusArea(){}}};
+bootMain.wm.addKeybinding=(name,_settings,_flags,mode,callback)=>{assert(mode===1,'Layouts only run in normal desktop mode');bindings.set(name,callback);};
+bootMain.wm.removeKeybinding=name=>bindings.delete(name);
 const Boot=new Function('Extension','Gio','St','Main','global','RedrawGuard','GtkMenuStyle','PanelMenu','PopupMenu',
     'Experience','ShellSurfaces','OverviewMaterial','LockMaterial','initializeProfile','comfortPolicy','materialValues',
-    'FrostEffect','gtkMenuCss','configureMaterials','readDesktopStyle',source+'\nreturn Polished;')(
-    class{getSettings(){const s=memorySettings();initializeProfile(s);return s;}},
+    'FrostEffect','gtkMenuCss','configureMaterials','readDesktopStyle','Meta','Shell','arrangeWindow',source+'\nreturn Polished;')(
+    class{getSettings(){const s=memorySettings();initializeProfile(s);s.set_boolean('smooth-performance',true);return s;}},
     {Settings:class{constructor(){return iface;}}},{Icon:class{}},bootMain,
     {display:bootDisplay,window_manager:wm,stage,get_window_actors:()=>[]},
     class extends Lifetime{setSuspended(){}},class{apply(css){if(css===null)gtkRemoved=true;}},
     {Button},{PopupSwitchMenuItem:Switch},class extends Lifetime{state={highContrast:false};},
-    Surfaces,Overview,Lock,initializeProfile,comfortPolicy,materialValues,MockFrost,(dark,alpha)=>dark+':'+alpha,configureMaterials,()=>({fontStyle:'',selection:'65,130,215'}));
+    Surfaces,Overview,Lock,initializeProfile,comfortPolicy,materialValues,MockFrost,(dark,alpha)=>dark+':'+alpha,configureMaterials,()=>({fontStyle:'',selection:'65,130,215'}),
+    {WindowType:types,KeyBindingFlags:{NONE:0}},{ActionMode:{NORMAL:1}},()=>layoutCalls++);
 const boot=new Boot();boot.enable();
+assert([...stage.handlers.values()].every(([name])=>name!=='before-paint'),
+    'Smooth mode registers no per-frame motion callback');
+assert(bindings.size===2&&!boot._button.visible,'Layout shortcuts are registered and the optional panel icon starts hidden');
+boot._settings.set_boolean('show-panel-indicator',true);
+assert(boot._button.visible,'The panel menu can be shown from preferences');
+bindings.get('polished-center-window')();assert(layoutCalls===1,'Shortcut invokes explicit window arrangement');
+session.isLocked=true;boot._refresh();bindings.get('polished-center-window')();
+assert(!boot._button.visible&&layoutCalls===1,'Lock hides the menu and prevents window arrangement');
+session.isLocked=false;
+boot._settings.set_boolean('enabled',false);bindings.get('polished-comfortable-window')();
+assert(layoutCalls===1,'Master off prevents window arrangement');
+boot._settings.set_boolean('enabled',true);
+boot._settings.set_boolean('smooth-performance',false);
+assert([...stage.handlers.values()].filter(([name])=>name==='before-paint').length===1,
+    'Glass mode registers exactly one workspace motion observer');
+const savedDensity=boot._settings.get_int('material-strength');
+boot._experience.state.onBattery=true;boot._syncMotionTracking();boot._refresh();
+assert(!boot._context().windowGlass&&boot._context().menuGlass&&!boot._context().dockGlass&&!boot._context().overviewGlass&&
+    [...stage.handlers.values()].every(([name])=>name!=='before-paint'),
+    'Unplugging uses the battery effect policy and removes the workspace observer');
+boot._settings.set_boolean('battery-dock-glass',true);
+assert(boot._context().dockGlass&&[...stage.handlers.values()].filter(([name])=>name==='before-paint').length===1,
+    'Enabling battery dock glass restores the required observer');
+boot._settings.set_boolean('battery-dock-glass',false);
+boot._experience.state.onBattery=false;boot._syncMotionTracking();boot._refresh();
+assert(boot._context().windowGlass&&boot._context().dockGlass&&boot._context().overviewGlass&&
+    boot._settings.get_int('material-strength')===savedDensity&&[...stage.handlers.values()].filter(([name])=>name==='before-paint').length===1,
+    'Reconnecting AC restores full glass and the observer without changing density');
+boot._settings.set_boolean('smooth-performance',true);
+assert([...stage.handlers.values()].every(([name])=>name!=='before-paint'),
+    'Returning to smooth mode removes the per-frame observer');
 const grabbed={};let refreshed=0,unrelated=0;
 boot._windows.set({}, {window:grabbed,effect:{invalidateBackdrop(){refreshed++;}}});
 boot._windows.set({}, {window:{},effect:{invalidateBackdrop(){unrelated++;}}});
@@ -159,6 +249,6 @@ bootMain.extensionManager={lookup:()=>({state:1})};
 let conflict=false;try{new Boot().enable();}catch(error){conflict=error.message.includes('Disable Prism');}
 assert(conflict,'Prism conflict is rejected before materials or styles are changed');
 assert(!MockFrost.interactive,'Disable clears the interactive freeze');
-assert(buttonDestroyed&&gtkRemoved&&[stage,wm,bootDisplay,overview,session,iface].every(item=>item.handlers.size===0),
+assert(bindings.size===0&&buttonDestroyed&&gtkRemoved&&[stage,wm,bootDisplay,overview,session,iface].every(item=>item.handlers.size===0),
     'A complete enable/disable releases signal wiring, status button and GTK material');
 print('Extension enable/disable and surface constructor wiring checks passed');

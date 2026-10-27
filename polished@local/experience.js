@@ -2,9 +2,14 @@ import Gio from 'gi://Gio';
 import GdkPixbuf from 'gi://GdkPixbuf';
 
 // Small, pure policies are shared by Shell, app backdrops, and tests.
-export function comfortPolicy(state, automatic) {
+export function comfortPolicy(state, automatic, manual = false, battery = {}) {
+    const batterySaving = Boolean(automatic && (state.onBattery || state.powerSaver));
+    const keep = {windows: false, menus: true, dock: false, overview: false, ...battery};
+    const enabled = kind => !manual && (!batterySaving || Boolean(keep[kind]));
     return {...state, powerSaver: Boolean(automatic && state.powerSaver),
-        blurFocusedOnly: Boolean(automatic && state.powerSaver)};
+        batterySaving, smoothPerformance: Boolean(manual),
+        windowGlass: enabled('windows'), menuGlass: enabled('menus'),
+        dockGlass: enabled('dock'), overviewGlass: enabled('overview')};
 }
 
 export function surfaceOpacity(kind, alpha) {
@@ -43,7 +48,7 @@ export function wallpaperLuminance(pixbuf) {
 
 export class Experience {
     constructor(settings, interfaceSettings, changed) {
-        this.state = {highContrast: false, powerSaver: false, luminance: null};
+        this.state = {highContrast: false, powerSaver: false, onBattery: false, luminance: null};
         this._settings = settings;
         this._interface = interfaceSettings;
         this._changed = changed;
@@ -56,6 +61,8 @@ export class Experience {
         this._listen(this._interface, 'changed::color-scheme', () => this._wallpaper());
         this._listen(settings, 'changed::appearance', () => this._wallpaper());
         this._listen(this._background, 'changed', () => this._wallpaper());
+        this._proxy('org.freedesktop.UPower', '/org/freedesktop/UPower',
+            'org.freedesktop.UPower', proxy => { this._upower = proxy; });
         this._proxy('org.freedesktop.UPower.PowerProfiles', '/org/freedesktop/UPower/PowerProfiles',
             'org.freedesktop.UPower.PowerProfiles', proxy => { this._power = proxy; });
         this._sync();
@@ -80,6 +87,7 @@ export class Experience {
     }
 
     _sync() {
+        this.state.onBattery = this._upower?.get_cached_property('OnBattery')?.deep_unpack() === true;
         this.state.highContrast = this._a11y.get_boolean('high-contrast');
         this.state.powerSaver = this._power?.get_cached_property('ActiveProfile')?.deep_unpack() === 'power-saver';
         this._changed?.();
@@ -126,5 +134,6 @@ export class Experience {
         for (const [object, id] of this._signals) object.disconnect(id);
         this._signals = [];
         this._power = null;
+        this._upower = null;
     }
 }

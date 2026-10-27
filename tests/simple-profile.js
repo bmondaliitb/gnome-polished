@@ -4,11 +4,17 @@ import {initializeProfile, applyRecommended, applyStrength, applyDesktopProfile,
 import {SOFT_TINT} from '../polished@local/materials.js';
 function assert(value,message){if(!value)throw new Error(message);}
 const settings=memorySettings();
-assert(settings.settings_schema.list_keys().length===6,'Only six current settings remain');
+for(const key of ['enabled','material-strength','desktop-profile','smooth-performance','appearance','auto-comfort','reduce-transparency'])
+    assert(settings.settings_schema.has_key(key),'Core preference remains available: '+key);
+assert(!settings.get_boolean('show-panel-indicator'),'Polished does not add top-bar clutter by default');
+assert(settings.get_string('wallpaper-backup')==='','No wallpaper is changed on installation');
 initializeProfile(settings);
+assert(!settings.get_boolean('smooth-performance')&&settings.get_boolean('auto-comfort'),'Glass is the default with automatic battery saving');
+assert(!settings.get_boolean('battery-window-glass')&&settings.get_boolean('battery-menu-glass')&&
+    !settings.get_boolean('battery-dock-glass')&&!settings.get_boolean('battery-overview-glass'),'Battery defaults keep only smaller glass surfaces');
 assert(settings.get_string('desktop-profile')==='airy'&&settings.get_int('material-strength')===50,'Independent comfort default');
 assert(materialValues(50).windowOpacity===96,'Default keeps working text nearly opaque');
-settings.set_boolean('enabled',false);settings.set_boolean('reduce-transparency',true);settings.set_string('appearance','dark');
+settings.set_boolean('smooth-performance',true);settings.set_boolean('battery-window-glass',true);settings.set_boolean('enabled',false);settings.set_boolean('reduce-transparency',true);settings.set_string('appearance','dark');
 const current=materialValues(50);
 const defaults={opacity:current.windowOpacity/100,detail:current.detail/100,tint:SOFT_TINT,profiles:{}};
 let previous=101;
@@ -28,6 +34,6 @@ for(let i=0;i<=100;i++){
 applyStrength(settings,17);initializeProfile(settings);
 assert(settings.get_int('material-strength')===17&&settings.get_string('desktop-profile')==='custom','Custom survives initialization');
 applyRecommended(settings);
-assert(!settings.get_boolean('enabled')&&settings.get_boolean('reduce-transparency')&&settings.get_string('appearance')==='dark','Appearance changes preserve user and accessibility choices');
+assert(settings.get_boolean('smooth-performance')&&settings.get_boolean('battery-window-glass')&&!settings.get_boolean('enabled')&&settings.get_boolean('reduce-transparency')&&settings.get_string('appearance')==='dark','Appearance changes preserve user and accessibility choices');
 GLib.file_set_contents('/tmp/polished-profile-default.json',JSON.stringify(defaults));
 print('Polished preset density, Custom clarity, independent settings and accessibility checks passed');

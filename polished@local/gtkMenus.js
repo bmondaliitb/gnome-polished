@@ -64,7 +64,20 @@ export function gtkMenuCss(dark, opacity) {
   ${state(':disabled')} { color: rgba(${fg},${MATERIAL_STATES.disabled}); }
   popover.menu modelbutton accelerator, popover.menu modelbutton .accelerator,
   popover.menu button.model accelerator, popover.menu button.model .accelerator {
-    color: rgba(${fg},0.58);
+    color: rgba(${fg},0.68);
+  }
+  popover.menu label.heading, popover.menu label.title {
+    font-weight: 600;
+  }
+  tooltip.background {
+    ${palette.fontStyle}
+    background-color: rgb(${bg});
+    background-image: none;
+    color: rgb(${fg});
+    border: 1px solid rgba(${palette.edge});
+    border-radius: 10px;
+    padding: 8px 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,${dark ? 0.24 : 0.14});
   }
   popover.menu separator {
     background-color: rgba(${fg},0.14); min-height: 1px; margin: 6px 8px;

@@ -258,3 +258,88 @@
 .polished-overview-material .search-entry:insensitive .search-entry-icon {
     color: rgba(242, 242, 242, 0.4);
 }
+
+/* Dense search surfaces keep text calm over an unblurred wallpaper in smooth
+ * mode. The wallpaper still supplies color around the working surfaces. */
+.polished-overview-material.polished-overview-smooth .search-section-content,
+.polished-overview-material.polished-overview-smooth .app-folder-dialog {
+    background-color: rgba(25, 28, 35, 0.94);
+}
+.polished-overview-material.polished-overview-smooth .search-entry {
+    background-color: rgba(25, 28, 35, 0.90);
+}
+.polished-overview-material.polished-overview-smooth .search-entry:hover {
+    background-color: rgba(25, 28, 35, 0.94);
+}
+.polished-overview-material.polished-overview-smooth .search-entry:focus,
+.polished-overview-material.polished-overview-smooth .search-entry:focus:hover {
+    background-color: rgba(25, 28, 35, 0.98);
+}
+.polished-overview-material.polished-overview-smooth .search-entry:insensitive,
+.polished-overview-material.polished-overview-smooth .search-entry:insensitive:hover {
+    background-color: rgba(25, 28, 35, 0.90);
+}
+
+/* Type hierarchy: medium section/source labels, clear titles, quieter metadata.
+ * Body text and control sizes continue to follow the desktop font. */
+.polished-material-dark .message-title,
+.polished-material-light .message-title,
+.polished-material-dark .message .message-content .message-title,
+.polished-material-light .message .message-content .message-title,
+.polished-material-dark .message-dialog-title,
+.polished-material-light .message-dialog-title,
+.polished-overview-material .list-search-result-title {
+    font-weight: 600;
+}
+.polished-material-dark .message .message-header .message-source-title,
+.polished-material-light .message .message-header .message-source-title {
+    font-weight: 500;
+}
+.polished-material-dark .message .message-header,
+.polished-material-dark .message .message-header .event-time,
+.polished-material-dark .message-dialog-description {
+    color: rgba(242, 242, 242, 0.72);
+}
+.polished-material-light .message .message-header,
+.polished-material-light .message .message-header .event-time,
+.polished-material-light .message-dialog-description {
+    color: rgba(28, 30, 40, 0.72);
+}
+
+/* Related floating surfaces share a small set of radii and spacing. Native
+ * action buttons, progress levels, icon sizes and focus rings remain intact. */
+.polished-material-dark.notification-banner,
+.polished-material-light.notification-banner,
+.polished-material-dark.switcher-list,
+.polished-material-dark.osd-window {
+    border-radius: 18px;
+}
+.polished-material-dark.modal-dialog,
+.polished-material-light.modal-dialog {
+    border-radius: 24px;
+}
+.polished-material-dark.tooltip,
+.polished-material-dark.dash-label,
+.polished-material-dark.screenshot-ui-tooltip {
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-weight: 400;
+}
+.polished-material-dark .message-dialog-content,
+.polished-material-light .message-dialog-content {
+    spacing: 12px;
+}
+.polished-material-dark .message .message-action-bin,
+.polished-material-light .message .message-action-bin {
+    spacing: 8px;
+    padding: 8px;
+}
+
+/* Preserve panel height, workspace dots, status/recording indicators and
+ * native hover/focus feedback. Reduce heavy type without shrinking targets. */
+#panel.polished-panel-dark,
+#panel.polished-panel-light,
+#panel.polished-panel-dark .panel-button,
+#panel.polished-panel-light .panel-button {
+    font-weight: 500;
+}

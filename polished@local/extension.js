@@ -2,6 +2,7 @@ import Gio from 'gi://Gio';
 import GObject from 'gi://GObject';
 import Meta from 'gi://Meta';
 import St from 'gi://St';
+import Shell from 'gi://Shell';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import {ExtensionState} from 'resource:///org/gnome/shell/misc/extensionUtils.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -20,6 +21,7 @@ import {Experience, comfortPolicy} from './experience.js';
 import {OverviewMaterial} from './overviewMaterial.js';
 import {LockMaterial} from './lockMaterial.js';
 import {readDesktopStyle} from './polish.js';
+import {arrangeWindow} from './windowLayout.js';
 import {initializeProfile, materialValues} from './simpleProfile.js';
 
 export default class Polished extends Extension {
@@ -34,6 +36,15 @@ export default class Polished extends Extension {
         this._connections = [];
         this._windows = new Map();
         this._workspaceMotion = false;
+        this._motionSignal = 0;
+        this._layoutBindings = [];
+        for (const [name, resize] of [['polished-center-window', false], ['polished-comfortable-window', true]]) {
+            Main.wm.addKeybinding(name, this._settings, Meta.KeyBindingFlags.NONE, Shell.ActionMode.NORMAL, () => {
+                if (this._settings.get_boolean('enabled') && !Main.sessionMode.isLocked)
+                    arrangeWindow(global.display.focus_window, resize, Meta.WindowType.NORMAL);
+            });
+            this._layoutBindings.push(name);
+        }
         this._redrawGuard = new RedrawGuard(() => global.stage.queue_redraw());
         this._gtkMenus = new GtkMenuStyle();
         this._gtkCss = undefined;
@@ -58,6 +69,7 @@ export default class Polished extends Extension {
         Main.panel.addToStatusArea(this.uuid, this._button);
         this._connect(this._settings, 'changed', () => {
             this._toggle.setToggleState(this._settings.get_boolean('enabled'));
+            this._syncMotionTracking();
             this._syncGtkMenus();
             this._refresh();
         });
@@ -70,7 +82,7 @@ export default class Polished extends Extension {
                     this._refresh();
                 });
         }
-        this._connect(global.display, 'notify::focus-window', () => this._refresh(false));
+        this._connect(global.display, 'notify::focus-window', () => this._refreshFocus());
         this._connect(global.display, 'grab-op-begin', () => FrostEffect.setInteractiveMotion(true));
         this._connect(global.display, 'grab-op-end', (_display, window) => {
             FrostEffect.setInteractiveMotion(false);
@@ -86,13 +98,13 @@ export default class Polished extends Extension {
         this._connect(Main.overview, 'showing', () => this._refresh());
         this._connect(Main.overview, 'hidden', () => this._refresh());
         this._connect(Main.sessionMode, 'updated', () => this._refresh());
-        this._connect(global.stage, 'before-paint', () => {
-            if (this._syncWorkspaceMotion() && !this._workspaceMotion) this._refresh();
-        });
+        this._syncMotionTracking();
         this._experience = new Experience(this._settings, this._interface, () => {
+            this._syncMotionTracking();
             this._syncGtkMenus();
             this._refresh();
         });
+        this._syncMotionTracking();
         this._shellSurfaces = new ShellSurfaces(Main.uiGroup, Main.panel,
             () => this._dark(), () => this._settings.get_boolean('enabled') &&
                 !this._reduced() && !Main.sessionMode.isLocked,
@@ -102,7 +114,7 @@ export default class Polished extends Extension {
             () => this._context());
         this._lockMaterial = new LockMaterial(Main.screenShield,
             () => this._settings.get_boolean('enabled') && !this._reduced() && Main.sessionMode.isLocked);
-        this._button.visible = !Main.sessionMode.isLocked;
+        this._button.visible = this._settings.get_boolean('show-panel-indicator') && !Main.sessionMode.isLocked;
         for (const actor of global.get_window_actors())
             this._watch(actor);
         this._syncGtkMenus();
@@ -137,7 +149,13 @@ export default class Polished extends Extension {
     _context() {
         const state = this._experience?.state ?? {};
         const automatic = this._settings.get_boolean('auto-comfort');
-        return {...comfortPolicy(state, automatic),
+        const battery = {
+            windows: this._settings.get_boolean('battery-window-glass'),
+            menus: this._settings.get_boolean('battery-menu-glass'),
+            dock: this._settings.get_boolean('battery-dock-glass'),
+            overview: this._settings.get_boolean('battery-overview-glass'),
+        };
+        return {...comfortPolicy(state, automatic, this._settings.get_boolean('smooth-performance'), battery),
             ...materialValues(this._settings.get_int('material-strength'))};
     }
 
@@ -149,7 +167,9 @@ export default class Polished extends Extension {
     _syncGtkMenus(disabling = false) {
         try {
             const active = !disabling && this._settings.get_boolean('enabled') && !this._reduced();
-            const css = active ? gtkMenuCss(this._dark(), this._context().shellOpacity) : null;
+            const context = this._context();
+            const opacity = !context.menuGlass ? Math.max(94, context.shellOpacity) : context.shellOpacity;
+            const css = active ? gtkMenuCss(this._dark(), opacity) : null;
             if (!disabling && this._gtkCss === css) return;
             this._gtkMenus?.apply(css);
             this._gtkCss = css;
@@ -160,7 +180,7 @@ export default class Polished extends Extension {
 
     _refresh(shell = true) {
         if (this._button) {
-            this._button.visible = !Main.sessionMode.isLocked;
+            this._button.visible = this._settings.get_boolean('show-panel-indicator') && !Main.sessionMode.isLocked;
             if (Main.sessionMode.isLocked) this._button.menu.close();
         }
         this._syncWorkspaceMotion();
@@ -170,10 +190,40 @@ export default class Polished extends Extension {
         for (const [actor, state] of this._windows) this._update(actor, state);
     }
 
+    _refreshFocus() {
+        this._syncWorkspaceMotion();
+        if (this._workspaceMotion || Main.sessionMode.isLocked) return;
+        const focus = global.display.focus_window;
+        // Focus changes need only the old/new focus families. Do not refresh
+        // the overview, scan Shell actors, or rewrite unrelated window rims.
+        for (const [actor, state] of this._windows) {
+            const parent = state.window.get_transient_for?.();
+            const focused = focus === state.window || Boolean(parent && focus === parent);
+            if (state.cachedFocus !== focused) this._update(actor, state);
+        }
+    }
+
+    _syncMotionTracking() {
+        const context = this._context();
+        const needed = this._settings.get_boolean('enabled') &&
+            (context.windowGlass || context.dockGlass) && !this._reduced();
+        if (needed && !this._motionSignal) {
+            this._motionSignal = global.stage.connect('before-paint', () => {
+                if (this._syncWorkspaceMotion() && !this._workspaceMotion) this._refresh();
+            });
+        } else if (!needed && this._motionSignal) {
+            global.stage.disconnect(this._motionSignal);
+            this._motionSignal = 0;
+            this._syncWorkspaceMotion();
+        }
+    }
+
     _syncWorkspaceMotion() {
         // GNOME 50 uses this controller for keyboard switches and touchpad
         // gestures, including cancellation. Observe it without wrapping methods.
-        const active = Boolean(Main.wm?._workspaceAnimation?._switchData);
+        // The observer is installed only when the current power policy needs
+        // workspace capture protection. Keep this per-frame check allocation-free.
+        const active = Boolean(this._motionSignal && Main.wm?._workspaceAnimation?._switchData);
         if (Boolean(this._workspaceMotion) === active) return false;
         this._workspaceMotion = active;
         FrostEffect.setWorkspaceMotion(active);
@@ -199,19 +249,26 @@ export default class Polished extends Extension {
         const focused = global.display.focus_window === w ||
             Boolean(parent && global.display.focus_window === parent);
         const active = s.get_boolean('enabled') && !this._reduced() &&
-            !Main.overview.visible && !Main.sessionMode.isLocked && eligible({
+            (!Main.overview.visible || !context.windowGlass) && !Main.sessionMode.isLocked && eligible({
                 normal: type === Meta.WindowType.NORMAL || isPopup || isDialog,
                 fullscreen: w.is_fullscreen(), minimized: w.minimized,
             });
-        if (!active) { this._clear(state); return; }
+        if (!active) { this._clear(state); state.cachedFocus = focused; return; }
+        if (!(isPopup ? context.menuGlass : context.windowGlass)) {
+            // Keep native client opacity and Mutter's normal culling path.
+            // A simple non-picking rim supplies focus without backdrop effects.
+            this._clear(state, !isPopup);
+            if (!isPopup) this._updateRim(actor, state, focused);
+            state.cachedFocus = focused;
+            return;
+        }
         if (!state.surface) {
             state.surface = clientSurfaceRoot(actor.get_children(), child =>
                 GObject.type_name_from_instance(child));
             if (!state.surface) return;
             state.opacity = state.surface.opacity;
         }
-        const blurAllowed = !context.blurFocusedOnly || focused;
-        const mode = blurAllowed ? 'frost' : 'none';
+        const mode = 'frost';
         if (state.layer && state.effectMode !== mode) { state.layer.destroy(); state.layer = null; state.effect = null; }
         if (isPopup) {
             // Popup frost is attached to the client surface below; never put
@@ -222,10 +279,11 @@ export default class Polished extends Extension {
             state.rim?.destroy();
             state.rim = null;
             state.rimStyle = null;
+            state.rimBounds = null;
         } else {
             if (!state.layer) {
                 state.layer = new VisualBackdrop({reactive: false, can_focus: false, track_hover: false, clip_to_allocation: true});
-                state.effect = mode === 'none' ? null : new FrostEffect();
+                state.effect = new FrostEffect();
                 state.effectMode = mode;
                 state.layerStyle = null;
                 state.paintKey = null;
@@ -238,22 +296,7 @@ export default class Polished extends Extension {
             state.layer.set_size(frame.width, frame.height);
             const dark = this._dark();
             const radius = 12;
-            // The rim is above the native client, so opaque CSD backgrounds
-            // cannot hide it. This is a single unfiltered, non-picking widget.
-            if (!state.rim) {
-                state.rim = new VisualBackdrop({reactive: false, can_focus: false,
-                    track_hover: false, clip_to_allocation: true});
-                actor.add_child(state.rim);
-            }
-            state.rim.set_position(frame.x - buffer.x, frame.y - buffer.y);
-            state.rim.set_size(frame.width, frame.height);
-            const palette = surfacePalette(dark);
-            const edge = focused ? palette.activeEdge : palette.inactiveEdge;
-            const rimStyle = `background-color: transparent; border: 1px solid rgba(${edge}); border-radius: ${radius}px;`;
-            if (state.rimStyle !== rimStyle) {
-                state.rim.set_style(rimStyle);
-                state.rimStyle = rimStyle;
-            }
+            this._updateRim(actor, state, focused);
             if (state.effect) {
                 state.effect.radii = [radius, radius, radius, radius];
             }
@@ -272,7 +315,7 @@ export default class Polished extends Extension {
                 state.layer.queue_redraw?.();
             }
         }
-        const popupFrost = isPopup && blurAllowed;
+        const popupFrost = isPopup;
         if (state.popupEffect && !popupFrost) {
             state.surface.remove_effect(state.popupEffect);
             state.popupEffect = null;
@@ -323,10 +366,37 @@ export default class Polished extends Extension {
         state.surface.opacity = popupFrost ? state.opacity : Math.round(state.opacity * opacity / 100);
     }
 
-    _clear(state) {
-        state.rim?.destroy();
-        state.rim = null;
-        state.rimStyle = null;
+    _updateRim(actor, state, focused) {
+        const frame = state.window.get_frame_rect();
+        const buffer = state.window.get_buffer_rect();
+        // Opaque CSDs cannot hide this unfiltered, non-picking edge.
+        if (!state.rim) {
+            state.rim = new VisualBackdrop({reactive: false, can_focus: false,
+                track_hover: false, clip_to_allocation: true});
+            actor.add_child(state.rim);
+        }
+        const bounds = [frame.x - buffer.x, frame.y - buffer.y, frame.width, frame.height];
+        if (!state.rimBounds || bounds.some((value, index) => value !== state.rimBounds[index])) {
+            state.rim.set_position(bounds[0], bounds[1]);
+            state.rim.set_size(bounds[2], bounds[3]);
+            state.rimBounds = bounds;
+        }
+        const palette = surfacePalette(this._dark());
+        const edge = focused ? palette.activeEdge : palette.inactiveEdge;
+        const style = `background-color: transparent; border: 1px solid rgba(${edge}); border-radius: 12px;`;
+        if (state.rimStyle !== style) {
+            state.rim.set_style(style);
+            state.rimStyle = style;
+        }
+    }
+
+    _clear(state, keepRim = false) {
+        if (!keepRim) {
+            state.rim?.destroy();
+            state.rim = null;
+            state.rimStyle = null;
+            state.rimBounds = null;
+        }
         if (state.layer) this._redrawGuard?.untrack(state.layer);
         if (state.surface) this._redrawGuard?.untrack(state.surface);
         if (state.popupEffect) state.surface?.remove_effect(state.popupEffect);
@@ -343,6 +413,10 @@ export default class Polished extends Extension {
     }
 
     disable() {
+        if (this._motionSignal) global.stage.disconnect(this._motionSignal);
+        this._motionSignal = 0;
+        for (const name of this._layoutBindings ?? []) Main.wm.removeKeybinding(name);
+        this._layoutBindings = [];
         FrostEffect.setWorkspaceMotion(false);
         FrostEffect.setInteractiveMotion(false);
         this._experience?.destroy();

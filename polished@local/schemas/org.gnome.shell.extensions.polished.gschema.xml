@@ -6,8 +6,29 @@
    <default>'airy'</default>
    <choices><choice value="subtle"/><choice value="balanced"/><choice value="airy"/><choice value="mist"/><choice value="custom"/></choices>
    <summary>Coordinated desktop translucency</summary>
-   <description>Subtle, Balanced, Airy, and Mist use the same cached rendering with different material densities. Airy is the default. Custom exposes the full strength range.</description>
+   <description>Subtle, Balanced, Airy, and Mist use different material densities. Glass is the default; battery options can reduce individual effects. Airy is the default. Custom exposes the full strength range.</description>
   </key>
+  <key name="smooth-performance" type="b">
+   <default>false</default>
+   <summary>Low power mode</summary>
+   <description>Manually turn off Polished blur and use solid application windows and denser desktop surfaces. Off by default so glass remains the normal appearance.</description>
+  </key>
+  <key name="show-panel-indicator" type="b">
+   <default>false</default><summary>Show Polished in the top bar</summary>
+  </key>
+  <key name="polished-center-window" type="as">
+   <default>['&lt;Super&gt;&lt;Alt&gt;c']</default><summary>Center the focused window</summary>
+  </key>
+  <key name="polished-comfortable-window" type="as">
+   <default>['&lt;Super&gt;&lt;Alt&gt;m']</default><summary>Give the focused window a comfortable size</summary>
+  </key>
+  <key name="wallpaper-backup" type="s">
+   <default>''</default><summary>Previous wallpaper settings saved by the quiet wallpaper action</summary>
+  </key>
+  <key name="battery-window-glass" type="b"><default>false</default><summary>Keep app-window glass on battery</summary></key>
+  <key name="battery-menu-glass" type="b"><default>true</default><summary>Keep menu glass on battery</summary></key>
+  <key name="battery-dock-glass" type="b"><default>false</default><summary>Keep dock glass on battery</summary></key>
+  <key name="battery-overview-glass" type="b"><default>false</default><summary>Keep overview blur on battery</summary></key>
   <key name="auto-comfort" type="b"><default>true</default></key>
   <key name="appearance" type="s"><default>'auto'</default></key>
   <key name="reduce-transparency" type="b"><default>false</default></key>

@@ -4,9 +4,9 @@ import * as Background from 'resource:///org/gnome/shell/ui/background.js';
 import {surfacePalette} from './materials.js';
 import {VisualBackdrop} from './backdrop.js';
 
-// The overview hides the desktop window group. Use GNOME's wallpaper source,
-// not live screen capture, and blur only that actor so controls stay sharp and
-// static wallpaper blur can be cached by the native ACTOR-mode effect.
+// Smooth mode keeps GNOME's overview rendering and adds only scoped styling.
+// Glass mode owns separate wallpaper actors with cached ACTOR-mode blur; it
+// never captures session windows or blurs the controls.
 export class OverviewMaterial {
     constructor(layout, permitted, context) {
         this._layout = layout;
@@ -18,7 +18,9 @@ export class OverviewMaterial {
         this._signals = [
             [this._root, this._root.connect('notify::visible', () => this.refresh())],
             [this._root, this._root.connect('notify::style', () => { if (!this._writing) this.refresh(); })],
-            [layout, layout.connect('monitors-changed', () => { this._clear(); this.refresh(); })],
+            [layout, layout.connect('monitors-changed', () => {
+                if (!this._smooth) { this._clear(); this.refresh(); }
+            })],
         ];
         this.refresh();
     }
@@ -28,11 +30,37 @@ export class OverviewMaterial {
             this._clear();
             return;
         }
-        if (!this._layer && !this._root.visible) return;
-        if (!this._layer) {
+        const smooth = Boolean(this._context().smoothPerformance || this._context().overviewGlass === false);
+        if (this._styled && this._smooth !== smooth) this._clear();
+        if (!this._styled && !this._root.visible) return;
+        if (!this._styled) {
             this._style = this._root.get_style();
             this._ownsSearchClass = !this._root.has_style_class_name('polished-overview-material');
             this._root.add_style_class_name('polished-overview-material');
+            this._styled = true;
+        } else if (this._root.get_style() !== this._appliedStyle) {
+            this._style = this._root.get_style();
+        }
+        this._smooth = smooth;
+        if (smooth) {
+            if (!this._root.has_style_class_name('polished-overview-smooth')) {
+                this._root.add_style_class_name('polished-overview-smooth');
+                this._ownsSmoothClass = true;
+            }
+        } else if (this._ownsSmoothClass) {
+            this._root.remove_style_class_name('polished-overview-smooth');
+            this._ownsSmoothClass = false;
+        }
+        const base = this._style?.trim() ?? '';
+        const background = smooth ? '' : 'background-color: transparent !important; background-image: none !important;';
+        this._appliedStyle = `${base}${base && !base.endsWith(';') ? ';' : ''} ${surfacePalette(true).fontStyle} ${background}`;
+        if (this._root.get_style() !== this._appliedStyle) {
+            this._writing = true;
+            try { this._root.set_style(this._appliedStyle); }
+            finally { this._writing = false; }
+        }
+        if (smooth) return;
+        if (!this._layer) {
             this._layer = new VisualBackdrop({reactive: false, can_focus: false, track_hover: false});
             this._layer.add_constraint(new Clutter.BindConstraint({source: this._root, coordinate: Clutter.BindCoordinate.ALL}));
             this._root.insert_child_at_index(this._layer, 0);
@@ -45,15 +73,6 @@ export class OverviewMaterial {
             this._tint = new VisualBackdrop({reactive: false, can_focus: false, track_hover: false});
             this._tint.add_constraint(new Clutter.BindConstraint({source: this._layer, coordinate: Clutter.BindCoordinate.ALL}));
             this._layer.add_child(this._tint);
-        } else if (this._root.get_style() !== this._appliedStyle) {
-            this._style = this._root.get_style();
-        }
-        const base = this._style?.trim() ?? '';
-        this._appliedStyle = `${base}${base && !base.endsWith(';') ? ';' : ''} ${surfacePalette(true).fontStyle} background-color: transparent !important; background-image: none !important;`;
-        if (this._root.get_style() !== this._appliedStyle) {
-            this._writing = true;
-            try { this._root.set_style(this._appliedStyle); }
-            finally { this._writing = false; }
         }
         // GNOME's overview labels use a light foreground even in light mode.
         // Keep a dark neutral veil rather than restyling every app/search label.
@@ -83,6 +102,8 @@ export class OverviewMaterial {
     _clear() {
         if (this._ownsSearchClass) this._root.remove_style_class_name('polished-overview-material');
         this._ownsSearchClass = false;
+        if (this._ownsSmoothClass) this._root.remove_style_class_name('polished-overview-smooth');
+        this._ownsSmoothClass = false;
         for (const [actor, record] of this._records) {
             if (record.effect) actor.remove_effect(record.effect);
             actor.disconnect(record.destroyId);
@@ -98,6 +119,8 @@ export class OverviewMaterial {
             finally { this._writing = false; }
         }
         this._appliedStyle = null;
+        this._styled = false;
+        this._smooth = undefined;
     }
 
     destroy() {

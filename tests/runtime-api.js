@@ -18,6 +18,8 @@ for (const name of ['grab-op-begin', 'grab-op-end']) {
     if (!signal || GObject.type_name(GObject.signal_query(signal).param_types[0]) !== 'MetaWindow')
         throw new Error(`Missing native window-grab signal ${name}`);
 }
+check(Meta.Window, ['allows_move', 'allows_resize', 'is_maximized', 'unmaximize', 'is_override_redirect',
+    'get_work_area_current_monitor', 'move_frame', 'move_resize_frame']);
 check(Clutter.PaintContext, ['get_framebuffer']);
 check(Clutter.Actor, ['continue_pick', 'get_size', 'get_resource_scale', 'get_paint_opacity']);
 check(Clutter.Actor, ['continue_paint', 'add_effect', 'remove_effect']);

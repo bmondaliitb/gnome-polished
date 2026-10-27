@@ -5,6 +5,9 @@ check:
 	gjs tools/check-syntax.js $(UUID)/extension.js $(UUID)/prefs.js $(UUID)/materials.js $(UUID)/shellSurfaces.js $(UUID)/gtkMenus.js $(UUID)/frostEffect.js $(UUID)/frostShader.js $(UUID)/backdrop.js $(UUID)/backdropRefreshEffect.js $(UUID)/windowSurface.js $(UUID)/frostGeometry.js $(UUID)/frostBlur.js
 	gjs tools/check-syntax.js $(UUID)/polish.js
 	gjs -m tests/polish.js
+	gjs -m tests/window-layout.js
+	gjs -m tests/quiet-wallpaper.js
+	gjs tools/check-syntax.js $(UUID)/quietWallpaper.js $(UUID)/windowLayout.js
 	gjs -m tests/materials.js
 	gjs -m tests/lifecycle.js
 	gjs -m tests/shell-surfaces.js
@@ -27,7 +30,7 @@ package: check
 	glib-compile-schemas --strict $(UUID)/schemas
 	mkdir -p dist
 	/usr/bin/python3 -c "from pathlib import Path; Path('dist/.polished-package.zip').unlink(missing_ok=True)"
-	cd $(UUID) && zip -qr ../dist/.polished-package.zip metadata.json stylesheet.css extension.js prefs.js materials.js shellSurfaces.js gtkMenus.js frostEffect.js frostShader.js backdrop.js backdropRefreshEffect.js redrawGuard.js windowSurface.js frostGeometry.js frostBlur.js experience.js overviewMaterial.js lockMaterial.js simpleProfile.js polish.js schemas
+	cd $(UUID) && zip -qr ../dist/.polished-package.zip metadata.json stylesheet.css extension.js prefs.js materials.js shellSurfaces.js gtkMenus.js frostEffect.js frostShader.js backdrop.js backdropRefreshEffect.js redrawGuard.js windowSurface.js frostGeometry.js frostBlur.js experience.js overviewMaterial.js lockMaterial.js simpleProfile.js polish.js windowLayout.js quietWallpaper.js wallpapers schemas
 	mv dist/.polished-package.zip dist/$(UUID).shell-extension.zip
 
 .PHONY: check-frost-gpu
@@ -39,3 +42,7 @@ check-frost-gpu:
 .PHONY: check-runtime-api
 check-runtime-api:
 	GI_TYPELIB_PATH=/usr/lib/gnome-shell:/usr/lib/x86_64-linux-gnu/mutter-18 LD_LIBRARY_PATH=/usr/lib/gnome-shell:/usr/lib/x86_64-linux-gnu/mutter-18 gjs -m tests/runtime-api.js
+
+.PHONY: check-wallpapers
+check-wallpapers:
+	gjs -m tests/quiet-wallpaper.js --render

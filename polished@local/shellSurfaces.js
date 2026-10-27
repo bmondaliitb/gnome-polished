@@ -53,7 +53,14 @@ export class ShellSurfaces {
                     shellSurfaceKind(classes) || shellSurfaceRole(classes)) this._queue();
             };
             ids.push(actor.connect('notify::style', changed));
-            ids.push(actor.connect('style-changed', changed));
+            ids.push(actor.connect('style-changed', () => {
+                if (this._settingStyle) return;
+                const saved = this._applied.get(actor);
+                // Inherited hover/focus/font notifications do not change our
+                // material. Only a surface's actual shape needs a new pass.
+                if (!saved || saved.role !== 'surface' || actor === this._panel) return;
+                if (JSON.stringify(this._radii(actor, saved.kind)) !== saved.radiiKey) this._queue();
+            }));
         }
         for (const child of actor.get_children()) this._watch(child, actor);
     }
@@ -184,8 +191,8 @@ export class ShellSurfaces {
         const palette = surfacePalette(dark);
         const tint = palette.background;
         const alpha = Math.max(40, Math.min(100, context.shellOpacity)) / 100;
-        const panelAlpha = Math.max(0, Math.min(100, context.panelOpacity)) / 100;
-        const panelTint = dark ? '32,34,38' : '218,222,228';
+        const panelAlpha = Math.max(context.smoothPerformance ? 72 : 0, Math.min(100, context.panelOpacity)) / 100;
+        const panelTint = palette.background;
         const panelDark = panelIsDark(dark, panelAlpha, context.luminance);
         const panelForeground = panelDark ? '246,247,249' : '16,20,26';
         for (const actor of this._watched.keys()) {
@@ -204,12 +211,16 @@ export class ShellSurfaces {
                 saved.style = actor.get_style();
             }
             this._syncClass(actor, saved, role === 'surface' && kind !== 'panel'
-                ? `polished-material-${kind === 'overlays' || dark ? 'dark' : 'light'}` : null);
+                ? `polished-material-${kind === 'overlays' || dark ? 'dark' : 'light'}`
+                : actor === this._panel ? `polished-panel-${panelDark ? 'dark' : 'light'}` : null);
             const radii = role === 'surface' ? this._radii(actor, kind) : null;
+            saved.kind = kind;
+            saved.radiiKey = JSON.stringify(radii);
             // The top bar and short-lived overlays are tint-only. Unknown
             // native shapes also keep tint rather than risk rectangular edges.
-            const type = role === 'surface' && kind !== 'panel' && kind !== 'overlays' && radii &&
-                !(context.powerSaver && kind === 'dock') ? 'frost' : null;
+            const glass = !context.smoothPerformance &&
+                (kind === 'dock' ? context.dockGlass !== false : context.menuGlass !== false);
+            const type = glass && role === 'surface' && kind !== 'panel' && kind !== 'overlays' && radii ? 'frost' : null;
             if (saved.type !== type) {
                 if (saved.effect) actor.remove_effect(saved.effect);
                 saved.effect = type ? new FrostEffect() : null;
@@ -218,6 +229,10 @@ export class ShellSurfaces {
                 if (saved.effect) actor.add_effect(saved.effect);
             }
             if (saved.effect) {
+                // St offscreen textures include transparent layout margins and
+                // shadow extents. Glass must follow the native painted alpha,
+                // not fill the actor's entire rounded allocation behind them.
+                saved.effect.nativeShape = true;
                 saved.effect.radii = radii;
                 saved.effect.radius = 36;
                 saved.effect.brightness = dark ? 0.85 : 1;
@@ -231,7 +246,10 @@ export class ShellSurfaces {
             this._redrawGuard?.track(actor, Boolean(saved.effect) && !this._motionPaused);
             // Theme !important rules (notably Yaru #panel) otherwise keep opaque paint.
             // BoxPointer paints its own Cairo background beneath popup-menu-content.
-            const materialAlpha = surfaceOpacity(kind, alpha);
+            // Without blur, denser fills keep wallpaper detail from competing
+            // with labels. The top bar retains its wallpaper-aware contrast.
+            const materialAlpha = !glass
+                ? Math.max(0.94, surfaceOpacity(kind, alpha)) : surfaceOpacity(kind, alpha);
             const background = role === 'surface'
                 ? (kind === 'panel' ? `rgba(${panelTint},${panelAlpha})`
                     : `rgba(${kind === 'overlays' ? surfacePalette(true).background : tint},${materialAlpha})`) : 'transparent';
@@ -243,7 +261,7 @@ export class ShellSurfaces {
             const foreground = role === 'foreground' ? `color: rgb(${panelForeground}) !important;`
                 : role === 'surface' && kind !== 'panel'
                     ? `color: rgb(${surfacePalette(kind === 'overlays' || dark).foreground}) !important;` : '';
-            const font = role === 'surface' && kind !== 'panel' ? palette.fontStyle : '';
+            const font = role === 'surface' ? palette.fontStyle : '';
             const fill = role === 'foreground' ? ''
                 : `background-image: none !important; background-color: ${background} !important; ${pointer}`;
             // An inset rim is visible even when the dock theme has zero border
@@ -251,8 +269,8 @@ export class ShellSurfaces {
             // spacing, input regions or adding another capture/effect actor.
             const edge = role === 'surface' && kind === 'dock'
                 ? `border-color: transparent; box-shadow: inset 0 0 0 1px rgba(${palette.edge}) !important;`
-                : role === 'surface' && kind !== 'panel' && kind !== 'overlays'
-                    ? `border-color: rgba(${palette.edge}); box-shadow: 0 6px 18px 0 rgba(0,0,0,${dark ? 0.24 : 0.14});` : '';
+                : role === 'surface' && kind !== 'panel'
+                    ? `border-color: rgba(${kind === 'overlays' ? surfacePalette(true).edge : palette.edge}); box-shadow: 0 ${kind === 'overlays' ? '4px 12px' : '6px 18px'} 0 rgba(0,0,0,${kind === 'overlays' || dark ? 0.24 : 0.14});` : '';
             saved.appliedStyle = `${base}${base && !base.endsWith(';') ? ';' : ''} ${fill} ${foreground} ${edge} ${font}`;
             if (actor.get_style() !== saved.appliedStyle) {
                 this._settingStyle = true;
