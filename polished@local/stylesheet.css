@@ -343,3 +343,37 @@
 #panel.polished-panel-light .panel-button {
     font-weight: 500;
 }
+
+/* A single floating sheet, with quieter sections inside it. Keep day buttons,
+ * selected dates and action feedback native, with accent keyboard focus. */
+.polished-material-dark .datemenu-calendar-column,
+.polished-material-light .datemenu-calendar-column {
+    border-color: rgba(128, 128, 128, 0.16);
+}
+.polished-material-dark .datemenu-displays-section,
+.polished-material-light .datemenu-displays-section {
+    background-color: transparent;
+    box-shadow: none;
+    border-color: transparent;
+}
+.polished-material-dark .datemenu-displays-box,
+.polished-material-light .datemenu-displays-box { spacing: 12px; }
+.polished-material-dark .message-list .message,
+.polished-material-light .message-list .message {
+    box-shadow: none;
+    border-color: transparent;
+}
+.polished-material-dark .message-list .message { background-color: rgba(255, 255, 255, 0.035); }
+.polished-material-light .message-list .message { background-color: rgba(28, 30, 40, 0.035); }
+.polished-material-dark .message-list .message:hover { background-color: rgba(255, 255, 255, 0.07); }
+.polished-material-light .message-list .message:hover { background-color: rgba(28, 30, 40, 0.07); }
+.polished-material-dark .calendar-day-heading,
+.polished-material-dark .datemenu-displays-section .world-clocks-timezone { color: rgba(242, 242, 242, 0.68); }
+.polished-material-light .calendar-day-heading,
+.polished-material-light .datemenu-displays-section .world-clocks-timezone { color: rgba(28, 30, 40, 0.68); }
+
+/* Keep an explicit accent focus ring on the quieter notification cards. */
+.polished-material-dark .message-list .message:focus,
+.polished-material-light .message-list .message:focus {
+    box-shadow: inset 0 0 0 2px -st-accent-color;
+}

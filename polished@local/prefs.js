@@ -1,3 +1,4 @@
+import {editShortcut} from './shortcutEditor.js';
 import Adw from 'gi://Adw';
 import Gio from 'gi://Gio';
 import Gtk from 'gi://Gtk';
@@ -149,9 +150,19 @@ export default class PolishedPreferences extends ExtensionPreferences {
                 shortcut.accelerator = settings.get_strv(key)[0] ?? '';
             });
             window.connect('close-request', () => { settings.disconnect(shortcutId); return false; });
+            const edit = new Gtk.Button({label: 'Edit…', valign: Gtk.Align.CENTER});
+            edit.connect('clicked', () => editShortcut(window, settings, key, title));
             row.add_suffix(shortcut);
+            row.add_suffix(edit);
             layoutGroup.add(row);
         }
+
+        const diagnostics = new Adw.PreferencesGroup({title: 'Performance diagnostics',
+            description: 'Optional capture counts, CPU submission timings and retained snapshot estimates in the GNOME Shell journal. Reports every 120 captures and when switched off. No polling timer; does not measure GPU time or frame rate.'});
+        const diagnosticSwitch = new Adw.SwitchRow({title: 'Record glass diagnostics'});
+        settings.bind('capture-diagnostics', diagnosticSwitch, 'active', Gio.SettingsBindFlags.DEFAULT);
+        diagnostics.add(diagnosticSwitch);
+        page.add(diagnostics);
 
         const help = new Adw.PreferencesGroup({title: 'One consistent material'});
         page.add(help);

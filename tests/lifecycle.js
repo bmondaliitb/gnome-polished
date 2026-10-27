@@ -4,6 +4,7 @@ import {initializeProfile,materialValues} from '../polished@local/simpleProfile.
 import {clientSurfaceRoot} from '../polished@local/windowSurface.js';
 import {eligible,materialStyle,configureMaterials,surfacePalette} from '../polished@local/materials.js';
 import {comfortPolicy} from '../polished@local/experience.js';
+import {WorkspaceResume} from '../polished@local/workspaceResume.js';
 function assert(value,message){if(!value)throw new Error(message);}
 const [,bytes]=GLib.file_get_contents('polished@local/extension.js');
 const source='const ExtensionState={ACTIVE:1,ACTIVATING:8};\n'+new TextDecoder().decode(bytes).replace(/^import .*;\n/gm,'').replace('export default class Polished','class Polished');
@@ -25,6 +26,14 @@ const win={get_window_type:()=>windowType,is_fullscreen:()=>fullscreen,get minim
     get_frame_rect:()=>({x:15,y:25,width:500,height:400}),get_buffer_rect:()=>({x:10,y:20}),
     get_transient_for:()=>null};
 const display={focus_window:win};
+const resumeTasks=new Map();let resumeTaskId=0;
+const resumeLoop={PRIORITY_LOW:300,SOURCE_REMOVE:false,
+    idle_add:(_priority,callback)=>{resumeTasks.set(++resumeTaskId,callback);return resumeTaskId;},source_remove:id=>resumeTasks.delete(id)};
+const workspaceStage={handlers:new Map(),next:0,
+    connect(name,callback){this.handlers.set(++this.next,[name,callback]);return this.next;},
+    disconnect(id){this.handlers.delete(id);},
+    emit(name){for(const [signal,callback]of [...this.handlers.values()])if(name===signal)callback();}};
+function resumeAfterFrame(){workspaceStage.emit('after-paint');for(const [id,callback]of [...resumeTasks]){resumeTasks.delete(id);callback();}}
 const main={overview:{visible:false},sessionMode:{isLocked:false},wm:{_workspaceAnimation:{_switchData:null}}};
 const Polished=new Function('Extension','Gio','Meta','St','Main','global','eligible','materialStyle','FrostEffect',
     'GObject','clientSurfaceRoot','VisualBackdrop','BackdropRefreshEffect','gtkMenuCss','comfortPolicy','materialValues','surfacePalette',
@@ -33,6 +42,8 @@ const Polished=new Function('Extension','Gio','Meta','St','Main','global','eligi
 const extension=new Polished();extension._settings=memorySettings();initializeProfile(extension._settings);
 extension._settings.set_boolean('smooth-performance',false);
 extension._motionSignal=1; // Isolated window tests simulate the glass observer.
+extension._workspaceDirtyWindows=new Set();
+extension._workspaceResume=new WorkspaceResume(workspaceStage,()=>extension._finishWorkspaceMotion(),resumeLoop);
 extension._interface={get_string:()=> 'prefer-dark'};
 extension._redrawGuard={track:(_actor,on,_effect,protect)=>protect?.(on),untrack(){}};
 const surface={opacity:240,effects:[],constructor:{$gtype:'MetaSurfaceContainerActorWayland'},
@@ -112,8 +123,28 @@ const layer=state.layer;
 main.wm._workspaceAnimation._switchData={};extension._syncWorkspaceMotion();
 extension._settings.set_int('material-strength',0);extension._update(actor,state);
 assert(suspended&&paused&&state.layer===layer&&surface.opacity===230,'Workspace motion freezes materials and suspends broad redraw protection');
-main.wm._workspaceAnimation._switchData=null;extension._syncWorkspaceMotion();extension._refresh();
-assert(!suspended&&!paused&&state.layer===layer&&surface.opacity===221,'Motion completion applies deferred density without rebuilding the backdrop');
+const scansBeforeFinish=shellScans;
+main.wm._workspaceAnimation._switchData=null;extension._syncWorkspaceMotion();
+assert(suspended&&paused&&extension._workspaceSettling&&surface.opacity===230&&shellScans===scansBeforeFinish,
+    'The finishing frame keeps the cached material and performs no Shell refresh');
+resumeAfterFrame();
+assert(!suspended&&!paused&&state.layer===layer&&surface.opacity===221&&shellScans===scansBeforeFinish,
+    'Deferred geometry/material changes apply after a painted frame without a whole-Shell refresh');
+let boundaryUpdates=0;const updateAtBoundary=extension._update;
+extension._update=(...args)=>{boundaryUpdates++;updateAtBoundary.apply(extension,args);};
+main.wm._workspaceAnimation._switchData={};extension._syncWorkspaceMotion();display.focus_window=null;
+main.wm._workspaceAnimation._switchData=null;extension._syncWorkspaceMotion();
+workspaceStage.emit('after-paint');
+main.wm._workspaceAnimation._switchData={};extension._syncWorkspaceMotion();
+assert(resumeTasks.size===0&&suspended&&boundaryUpdates===0,'A chained switch cancels queued work before any focus/material update');
+main.wm._workspaceAnimation._switchData=null;extension._syncWorkspaceMotion();resumeAfterFrame();
+assert(boundaryUpdates===1&&shellScans===scansBeforeFinish,'A normal completed switch updates only the affected focus family');
+extension._update=updateAtBoundary;display.focus_window=win;
+main.wm._workspaceAnimation._switchData={};extension._syncWorkspaceMotion();extension._refresh();
+assert(extension._workspaceFullRefresh&&shellScans===scansBeforeFinish,'Explicit appearance changes are deferred during animation');
+main.wm._workspaceAnimation._switchData=null;extension._syncWorkspaceMotion();resumeAfterFrame();
+assert(shellScans===scansBeforeFinish+1&&!extension._workspaceFullRefresh&&extension._workspaceDirtyWindows.size===0,
+    'A real deferred appearance change still refreshes every material exactly once after the settled frame');
 extension._clear(state);
 assert(surface.opacity===240&&surface.effects.length===0&&actor.effects.length===0,'Final cleanup releases popup and window effects');
 // Switch live between glass and smooth rendering, including existing popups.
@@ -169,6 +200,7 @@ class Events {
     constructor(){this.handlers=new Map();this.next=0;}
     connect(name,callback){this.handlers.set(++this.next,[name,callback]);return this.next;}
     disconnect(id){this.handlers.delete(id);}queue_redraw(){}
+    emit(name){for(const [signal,callback]of [...this.handlers.values()])if(name===signal)callback();}
 }
 const stage=new Events(),wm=new Events(),bootDisplay=new Events(),overview=new Events(),session=new Events();
 overview.visible=false;session.isLocked=false;
@@ -198,14 +230,15 @@ bootMain.wm.addKeybinding=(name,_settings,_flags,mode,callback)=>{assert(mode===
 bootMain.wm.removeKeybinding=name=>bindings.delete(name);
 const Boot=new Function('Extension','Gio','St','Main','global','RedrawGuard','GtkMenuStyle','PanelMenu','PopupMenu',
     'Experience','ShellSurfaces','OverviewMaterial','LockMaterial','initializeProfile','comfortPolicy','materialValues',
-    'FrostEffect','gtkMenuCss','configureMaterials','readDesktopStyle','Meta','Shell','arrangeWindow',source+'\nreturn Polished;')(
+    'FrostEffect','gtkMenuCss','configureMaterials','readDesktopStyle','Meta','Shell','arrangeWindow','WorkspaceResume',source+'\nreturn Polished;')(
     class{getSettings(){const s=memorySettings();initializeProfile(s);s.set_boolean('smooth-performance',true);return s;}},
     {Settings:class{constructor(){return iface;}}},{Icon:class{}},bootMain,
     {display:bootDisplay,window_manager:wm,stage,get_window_actors:()=>[]},
     class extends Lifetime{setSuspended(){}},class{apply(css){if(css===null)gtkRemoved=true;}},
     {Button},{PopupSwitchMenuItem:Switch},class extends Lifetime{state={highContrast:false};},
     Surfaces,Overview,Lock,initializeProfile,comfortPolicy,materialValues,MockFrost,(dark,alpha)=>dark+':'+alpha,configureMaterials,()=>({fontStyle:'',selection:'65,130,215'}),
-    {WindowType:types,KeyBindingFlags:{NONE:0}},{ActionMode:{NORMAL:1}},()=>layoutCalls++);
+    {WindowType:types,KeyBindingFlags:{NONE:0}},{ActionMode:{NORMAL:1}},()=>layoutCalls++,
+    class extends WorkspaceResume{constructor(stage,resume){super(stage,resume,resumeLoop);}});
 const boot=new Boot();boot.enable();
 assert([...stage.handlers.values()].every(([name])=>name!=='before-paint'),
     'Smooth mode registers no per-frame motion callback');
@@ -245,7 +278,11 @@ for(const [, [name,callback]] of bootDisplay.handlers) if(name==='grab-op-begin'
 assert(MockFrost.interactive,'Interactive grabs freeze cached backdrops');
 for(const [, [name,callback]] of bootDisplay.handlers) if(name==='grab-op-end')callback(bootDisplay,grabbed);
 assert(!MockFrost.interactive&&refreshed===1&&unrelated===0,'Release refreshes only the grabbed window');
-boot._windows.clear();boot.disable();
+boot._windows.clear();boot._settings.set_boolean('smooth-performance',false);
+bootMain.wm._workspaceAnimation._switchData={};stage.emit('before-paint');
+bootMain.wm._workspaceAnimation._switchData=null;stage.emit('before-paint');stage.emit('after-paint');
+assert(resumeTasks.size===1,'A workspace resume is queued before disable');
+boot.disable();assert(resumeTasks.size===0,'Disable cancels all queued workspace work');
 bootMain.extensionManager={lookup:()=>({state:1})};
 let conflict=false;try{new Boot().enable();}catch(error){conflict=error.message.includes('Disable Prism');}
 assert(conflict,'Prism conflict is rejected before materials or styles are changed');

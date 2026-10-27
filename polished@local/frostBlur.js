@@ -35,6 +35,10 @@ export class BlurBuffer {
         this._blur = this._pipeline(BLUR_CODE);
     }
 
+    get estimatedBytes() {
+        return this._targets.reduce((bytes, target) => bytes + target.width * target.height * 4, 0);
+    }
+
     _pipeline(code) {
         const pipeline = Cogl.Pipeline.new(this._context);
         pipeline.add_snippet(Cogl.Snippet.new(Cogl.SnippetHook.FRAGMENT, FILTER_DECLARATIONS, code));

@@ -1,11 +1,16 @@
 UUID = polished@local
 .PHONY: check package
 check:
+	gjs -m tests/capture-resources.js
+	gjs -m tests/shortcut-editor.js
+	gjs tools/check-syntax.js $(UUID)/captureResources.js $(UUID)/shortcutEditor.js
 	glib-compile-schemas --strict --dry-run $(UUID)/schemas
 	gjs tools/check-syntax.js $(UUID)/extension.js $(UUID)/prefs.js $(UUID)/materials.js $(UUID)/shellSurfaces.js $(UUID)/gtkMenus.js $(UUID)/frostEffect.js $(UUID)/frostShader.js $(UUID)/backdrop.js $(UUID)/backdropRefreshEffect.js $(UUID)/windowSurface.js $(UUID)/frostGeometry.js $(UUID)/frostBlur.js
 	gjs tools/check-syntax.js $(UUID)/polish.js
 	gjs -m tests/polish.js
 	gjs -m tests/window-layout.js
+	gjs -m tests/workspace-resume.js
+	gjs tools/check-syntax.js $(UUID)/workspaceResume.js
 	gjs -m tests/quiet-wallpaper.js
 	gjs tools/check-syntax.js $(UUID)/quietWallpaper.js $(UUID)/windowLayout.js
 	gjs -m tests/materials.js
@@ -30,7 +35,7 @@ package: check
 	glib-compile-schemas --strict $(UUID)/schemas
 	mkdir -p dist
 	/usr/bin/python3 -c "from pathlib import Path; Path('dist/.polished-package.zip').unlink(missing_ok=True)"
-	cd $(UUID) && zip -qr ../dist/.polished-package.zip metadata.json stylesheet.css extension.js prefs.js materials.js shellSurfaces.js gtkMenus.js frostEffect.js frostShader.js backdrop.js backdropRefreshEffect.js redrawGuard.js windowSurface.js frostGeometry.js frostBlur.js experience.js overviewMaterial.js lockMaterial.js simpleProfile.js polish.js windowLayout.js quietWallpaper.js wallpapers schemas
+	cd $(UUID) && zip -qr ../dist/.polished-package.zip metadata.json stylesheet.css extension.js prefs.js materials.js shellSurfaces.js gtkMenus.js frostEffect.js frostShader.js backdrop.js backdropRefreshEffect.js redrawGuard.js windowSurface.js frostGeometry.js frostBlur.js experience.js overviewMaterial.js lockMaterial.js simpleProfile.js polish.js windowLayout.js quietWallpaper.js workspaceResume.js captureResources.js shortcutEditor.js wallpapers schemas
 	mv dist/.polished-package.zip dist/$(UUID).shell-extension.zip
 
 .PHONY: check-frost-gpu

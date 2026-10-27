@@ -1,3 +1,5 @@
+import GLib from 'gi://GLib';
+import {snapshotBudget, CaptureMetrics} from './captureResources.js';
 import Clutter from 'gi://Clutter';
 import Cogl from 'gi://Cogl';
 import GObject from 'gi://GObject';
@@ -7,6 +9,7 @@ import {FROST_DECLARATIONS, FROST_CODE} from './frostShader.js';
 import {BlurBuffer} from './frostBlur.js';
 import {framebufferCapture} from './frostGeometry.js';
 
+const metrics = new CaptureMetrics(() => GLib.get_monotonic_time());
 let workspaceMotion = false;
 let interactiveMotion = false;
 
@@ -14,6 +17,8 @@ let interactiveMotion = false;
 // around Shell.BlurEffect alone can capture an empty offscreen buffer instead.
 export const FrostEffect = GObject.registerClass({GTypeName: 'PolishedRoundedFrostEffect'},
 class FrostEffect extends Shell.GLSLEffect {
+    static get metrics() { return metrics; }
+    static configureDiagnostics(enabled) { metrics.configure(enabled); }
     static setWorkspaceMotion(active) { workspaceMotion = active; }
     static setInteractiveMotion(active) { interactiveMotion = active; }
 
@@ -61,6 +66,32 @@ class FrostEffect extends Shell.GLSLEffect {
         this.queue_repaint();
     }
 
+    trimSnapshots() { snapshotBudget.trim(); }
+
+    releaseSnapshots() {
+        for (const entry of [...this._sources.values()]) this.releaseSnapshot(entry);
+    }
+
+    canReleaseSnapshot(_entry) {
+        return !workspaceMotion && !interactiveMotion && !this.get_actor()?.is_mapped?.();
+    }
+
+    releaseSnapshot(entry) {
+        for (const [source, cached] of this._sources) {
+            if (cached !== entry) continue;
+            this._sources.delete(source);
+            snapshotBudget.forget(entry.token);
+        }
+        if (this._boundBackdrop === entry.blurred) {
+            this._uniformPipeline?.set_layer_texture(1, null);
+            this._boundBackdrop = null;
+        }
+        if (this._texture !== entry.texture) return;
+        this._capture = this._texture = this._framebuffer = this._blurBuffer = this._blurred = null;
+        // Do not queue a hidden actor. Its next visible paint requests a capture.
+        this._pendingCapture = true;
+    }
+
     _report(error) {
         if (!this._logged) console.error('Polished: rounded frost fell back to native translucent paint', error);
         this._logged = true;
@@ -106,6 +137,8 @@ class FrostEffect extends Shell.GLSLEffect {
                 this._blurred = cached.blurred;
                 if (cached.signature === signature) {
                     this._capture = capture;
+                    snapshotBudget.touch(cached.token);
+                    metrics.hit();
                     this._setPending(false);
                     return true;
                 }
@@ -124,6 +157,7 @@ class FrostEffect extends Shell.GLSLEffect {
                 this._setPending(true, true);
                 return Boolean(this._capture);
             }
+            const started = metrics.start();
             // Capture only the effect's bounds. Allocation padding can reach
             // outside the region repainted by Mutter; filtering those pixels
             // leaks stale framebuffer tiles into an otherwise current backdrop.
@@ -138,11 +172,14 @@ class FrostEffect extends Shell.GLSLEffect {
             const radius = Math.max(0, Math.min(80, this.radius)) * capture.scale;
             this._blurred = radius > 0 ? this._blurBuffer.render(this._texture, radius) : this._texture;
             this._capture = capture;
-            this._sources.set(source, {signature, texture: this._texture,
-                framebuffer: this._framebuffer, blurBuffer: this._blurBuffer,
-                blurred: this._blurred});
-            // Bound storage if transient offscreen targets keep appearing.
-            if (this._sources.size > 4) this._sources.delete(this._sources.keys().next().value);
+            if (cached) snapshotBudget.forget(cached.token);
+            cached = {signature, texture: this._texture,
+                framebuffer: this._framebuffer, blurBuffer: this._blurBuffer, blurred: this._blurred};
+            this._sources.set(source, cached);
+            cached.token = snapshotBudget.retain(this, cached,
+                rect.width * rect.height * 4 + (this._blurBuffer.estimatedBytes ?? 0));
+            if (this._sources.size > 4) this.releaseSnapshot(this._sources.values().next().value);
+            metrics.captured(started, snapshotBudget.trim());
             this._setPending(false);
             return true;
         } catch (error) {

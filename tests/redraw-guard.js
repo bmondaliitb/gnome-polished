@@ -77,6 +77,8 @@ effect.needsCapture=true;effect.captureChanged();stage.emit('before-paint');
 stage.emit('after-paint');flush();
 assert(drawFlags===0&&effect.needsCapture&&!effect.captureAllowed&&stage.handlers.size===0,
     'An unpainted window cannot keep full redraws or frame observers enabled indefinitely');
+captures.setSuspended(true);captures.setSuspended(false);
+assert(drawFlags===0&&stage.handlers.size===0,'Workspace resume does not rearm an unpainted snapshot or request a full redraw');
 effect.captureChanged();stage.emit('before-paint');
 assert(effect.captureAllowed,'A later paint can request another complete capture frame');
 effect.needsCapture=false;effect.captureChanged();stage.emit('after-paint');flush();
@@ -84,3 +86,30 @@ captures.destroy();
 assert(!effect.captureChanged&&!surface.signals.size&&!idleCallbacks.size&&!stage.handlers.size,
     'Capture observers, queued cleanup and stage handlers are fully released');
 print('Stable redraw ownership, visibility, lifecycle, and no-continuous-repaint checks passed');
+const batch = new Guard(() => repaints++);
+const waiting = Array.from({length: 5}, () => ({actor: new Actor(true), effect: {needsCapture: true}}));
+for (const {actor, effect} of waiting) batch.track(actor, true, effect);
+let frames = 0;
+while (waiting.some(({effect}) => effect.needsCapture)) {
+    stage.emit('before-paint'); frames++;
+    const admitted = waiting.filter(({effect}) => effect.captureAllowed);
+    assert(admitted.length <= 2 && admitted.length > 0, 'Each capture frame admits at most two surfaces and makes progress');
+    for (const {effect} of admitted) { effect.needsCapture = false; effect.captureChanged(); }
+    stage.emit('after-paint'); flush();
+    assert(frames < 5, 'Deferred requests cannot stall indefinitely');
+}
+assert(frames === 3, 'Five simultaneous surfaces are spread over three frames');
+batch.destroy(); flush();
+assert(stage.handlers.size === 0 && drawFlags === 0, 'Batch completion releases redraw and stage hooks');
+const priorityGuard = new Guard();
+const priorityActors = Array.from({length: 3}, () => new Actor(true));
+priorityActors[0].meta_window = {has_focus: () => false};
+priorityActors[1].meta_window = {has_focus: () => true};
+const priorityEffects = priorityActors.map(() => ({needsCapture: true}));
+priorityActors.forEach((actor, index) => priorityGuard.track(actor, true, priorityEffects[index]));
+stage.emit('before-paint');
+assert(!priorityEffects[0].captureAllowed && priorityEffects[1].captureAllowed && priorityEffects[2].captureAllowed,
+    'Floating surfaces and the focused window are admitted before background windows');
+priorityGuard.setSuspended(true);
+assert(priorityEffects.every(effect => !effect.captureAllowed), 'Motion cancels prepared batch permissions');
+priorityGuard.destroy(); flush();

@@ -32,5 +32,6 @@
   <key name="auto-comfort" type="b"><default>true</default></key>
   <key name="appearance" type="s"><default>'auto'</default></key>
   <key name="reduce-transparency" type="b"><default>false</default></key>
+  <key name="capture-diagnostics" type="b"><default>false</default><summary>Log capture timing and cache diagnostics</summary></key>
  </schema>
 </schemalist>

@@ -1,0 +1,28 @@
+import {SnapshotBudget, CaptureMetrics} from '../polished@local/captureResources.js';
+function assert(value, message) { if (!value) throw new Error(message); }
+const budget = new SnapshotBudget(100);
+const evicted = [];
+const owner = {visible: false, canReleaseSnapshot() { return !this.visible; }, releaseSnapshot(entry) { evicted.push(entry); }};
+const first = {}, second = {}, third = {};
+const a = budget.retain(owner, first, 40);
+budget.retain(owner, second, 40);
+budget.touch(a);
+budget.retain(owner, third, 40);
+assert(evicted[0] === second && budget.trim() === 80, 'Budget evicts least recently used eligible snapshot');
+owner.visible = true;
+const large = {};
+const token = budget.retain(owner, large, 120);
+assert(budget.trim() === 200 && evicted.length === 1, 'Visible working sets survive budget pressure without recapture thrashing');
+owner.visible = false;
+assert(budget.trim() === 0 && evicted.includes(large), 'Hidden snapshots become reclaimable without a refresh timer');
+budget.forget(token);
+let time = 0; const reports = [];
+const metrics = new CaptureMetrics(() => time, line => reports.push(line));
+metrics.captured(0, 10); metrics.hit();
+assert(metrics.captures === 0 && reports.length === 0, 'Diagnostics default off with no timing/logging');
+metrics.configure(true);
+const start = metrics.start(); time = 2400;
+metrics.captured(start, 1048576); metrics.hit(); metrics.frame(3);
+metrics.configure(false);
+assert(reports.length === 2 && reports[1].includes('cpuMeanMs=2.40') && reports[1].includes('deferred=3') && reports[1].includes('retainedEstimateMiB=1.0'), 'Opt-in summary measures submission timing, captures, hits and scheduled work');
+print('Shared snapshot accounting, protected visible working sets, LRU eviction and opt-in diagnostics passed');

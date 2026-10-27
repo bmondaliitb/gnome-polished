@@ -5,7 +5,8 @@ import GLib from 'gi://GLib';
 // Keep broad redraws and per-window culling protection only for capture frames,
 // then release them after painting has finished rather than during traversal.
 export class RedrawGuard {
-    constructor(repaint = () => {}, api = Clutter, stage = global.stage) {
+    constructor(repaint = () => {}, api = Clutter, stage = global.stage, metrics = null) {
+        this._metrics = metrics;
         this._api = api;
         this._repaint = repaint;
         this._actors = new Map();
@@ -25,8 +26,8 @@ export class RedrawGuard {
     }
 
     setSuspended(suspended) {
+        if (this._suspended === suspended) return;
         this._suspended = suspended;
-        if (!suspended) this._rearm();
         this._sync();
         this._settle();
     }
@@ -38,6 +39,7 @@ export class RedrawGuard {
         if (saved) this.untrack(actor);
         const record = {effect, protect, requested: effect ? effect.needsCapture : true, prepared: false, ids: [
             actor.connect('notify::mapped', () => {
+                if (!actor.is_mapped()) effect?.trimSnapshots?.();
                 if (effect?.needsCapture) record.requested = true;
                 this._sync();
             }),
@@ -58,6 +60,7 @@ export class RedrawGuard {
         if (saved.effect) {
             saved.effect.captureChanged = null;
             saved.effect.captureAllowed = false;
+            saved.effect.releaseSnapshots?.();
         }
         saved.protect?.(false);
         for (const id of saved.ids) actor.disconnect(id);
@@ -88,12 +91,22 @@ export class RedrawGuard {
         if (needed && this._paintSignals.length === 0) {
             this._paintSignals = [
                 this._stage.connect('before-paint', () => {
-                    for (const [actor, saved] of this._actors) {
-                        if (!this._pending(actor, saved)) continue;
+                    const pending = [...this._actors].filter(([actor, saved]) => this._pending(actor, saved));
+                    // Floating surfaces, then focused windows, then other windows.
+                    // Stable ordering keeps older requests ahead within each group.
+                    const priority = actor => {
+                        const window = actor.meta_window ?? actor.get_meta_window?.();
+                        return !window ? 2 : window.has_focus?.() ? 1 : 0;
+                    };
+                    pending.sort(([a], [b]) => priority(b) - priority(a));
+                    let admitted = 0;
+                    for (const [actor, saved] of pending) {
+                        if (saved.effect && admitted++ >= 2) continue;
                         saved.prepared = true;
                         saved.protect?.(true);
                         if (saved.effect) saved.effect.captureAllowed = true;
                     }
+                    this._metrics?.frame(Math.max(0, admitted - 2));
                 }),
                 this._stage.connect('after-paint', () => this._settle()),
             ];
@@ -127,6 +140,7 @@ export class RedrawGuard {
             if (saved.effect) saved.effect.captureAllowed = false;
             needed ||= this._pending(actor, saved);
         }
+        if (needed && this._enabled && !this._suspended) this._repaint();
         if (!needed && this._owned) {
             // Preserve flags set before Polished and unrelated debugging flags.
             this._api.remove_debug_flags(0, this._api.DrawDebugFlag.DISABLE_CLIPPED_REDRAWS, 0);

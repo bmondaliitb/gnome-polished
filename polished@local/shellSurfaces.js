@@ -28,12 +28,12 @@ export class ShellSurfaces {
         this._watched.set(actor, ids);
         this._parents.set(actor, parent);
         ids.push(actor.connect('child-added', (_actor, child) => {
-            this._watch(child, actor);
-            this._queue();
+            const affectsMaterial = this._watch(child, actor);
+            if (affectsMaterial || this._describe(actor).kind) this._queue();
         }));
         ids.push(actor.connect('child-removed', (_actor, child) => {
-            this._unwatch(child);
-            this._queue();
+            const affectsMaterial = this._unwatch(child);
+            if (affectsMaterial || this._describe(actor).kind) this._queue();
         }));
         ids.push(actor.connect('destroy', () => this._forget(actor)));
         ids.push(actor.connect('notify::mapped', () => {
@@ -62,11 +62,15 @@ export class ShellSurfaces {
                 if (JSON.stringify(this._radii(actor, saved.kind)) !== saved.radiiKey) this._queue();
             }));
         }
-        for (const child of actor.get_children()) this._watch(child, actor);
+        let affectsMaterial = Boolean(this._describe(actor).kind);
+        for (const child of actor.get_children()) affectsMaterial = this._watch(child, actor) || affectsMaterial;
+        return affectsMaterial;
     }
 
     _queue() {
-        if (this._destroying || this._source) return;
+        if (this._destroying) return;
+        if (this._motionPaused) { this._refreshPending = true; return; }
+        if (this._source) return;
         this._source = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
             this._source = 0;
             this.refresh();
@@ -109,8 +113,10 @@ export class ShellSurfaces {
     }
 
     _unwatch(actor) {
-        for (const child of actor.get_children()) this._unwatch(child);
+        let affectsMaterial = this._applied.has(actor) || Boolean(this._describe(actor).kind);
+        for (const child of actor.get_children()) affectsMaterial = this._unwatch(child) || affectsMaterial;
         this._forget(actor);
+        return affectsMaterial;
     }
 
     _hasMenuSurface(actor) {
@@ -172,10 +178,16 @@ export class ShellSurfaces {
     }
 
     setMotionPaused(paused) {
-        if (Boolean(this._motionPaused) === paused) return;
+        // RedrawGuard owns the shared suspension. Keep records/observers in
+        // place so a workspace switch cannot rearm every uncaptured surface.
         this._motionPaused = paused;
-        for (const [actor, saved] of this._applied) {
-            this._redrawGuard?.track(actor, Boolean(saved.effect) && !paused, saved.effect);
+        if (paused && this._source) {
+            GLib.source_remove(this._source);
+            this._source = 0;
+            this._refreshPending = true;
+        } else if (!paused && this._refreshPending) {
+            this._refreshPending = false;
+            this._queue();
         }
     }
 
@@ -243,7 +255,7 @@ export class ShellSurfaces {
                     actor.queue_redraw?.();
                 }
             }
-            this._redrawGuard?.track(actor, Boolean(saved.effect) && !this._motionPaused, saved.effect);
+            this._redrawGuard?.track(actor, Boolean(saved.effect), saved.effect);
             // Theme !important rules (notably Yaru #panel) otherwise keep opaque paint.
             // BoxPointer paints its own Cairo background beneath popup-menu-content.
             // Without blur, denser fills keep wallpaper detail from competing
@@ -262,7 +274,10 @@ export class ShellSurfaces {
                 : role === 'surface' && kind !== 'panel'
                     ? `color: rgb(${surfacePalette(kind === 'overlays' || dark).foreground}) !important;` : '';
             const font = role === 'surface' ? palette.fontStyle : '';
-            const fill = role === 'foreground' ? ''
+            const messageCard = role === 'inset' && kind === 'menus' &&
+                (actor.get_style_class_name?.() ?? '').split(/\s+/).includes('message');
+            const fill = messageCard ? 'background-image: none !important;'
+                : role === 'foreground' ? ''
                 : `background-image: none !important; background-color: ${background} !important; ${pointer}`;
             // An inset rim is visible even when the dock theme has zero border
             // width. It follows native radii without changing allocation, icon

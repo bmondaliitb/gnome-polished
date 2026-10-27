@@ -1,3 +1,4 @@
+import {snapshotBudget, CaptureMetrics} from '../polished@local/captureResources.js';
 import GLib from 'gi://GLib';
 import Graphene from 'gi://Graphene';
 import {framebufferCapture} from '../polished@local/frostGeometry.js';
@@ -19,8 +20,8 @@ class Parent {
 class Texture {constructor(w,h){this.w=w;this.h=h;}get_width(){return this.w;}get_height(){return this.h;}}
 const types={Texture2D:{new_with_size:(_ctx,w,h)=>new Texture(w,h)},
     Offscreen:{new_with_texture:()=>({allocate(){}})},PipelineFilter:{LINEAR:0},PipelineWrapMode:{CLAMP_TO_EDGE:0}};
-const Effect=new Function('Clutter','Cogl','GObject','Shell','FROST_DECLARATIONS','FROST_CODE','framebufferCapture','BlurBuffer','console',source+'\nreturn FrostEffect;')(
-    {EffectPaintFlags:{ACTOR_DIRTY:1,BYPASS_EFFECT:2}},types,{registerClass:(_meta,cls)=>cls},{GLSLEffect:Parent},
+const Effect=new Function('GLib','snapshotBudget','CaptureMetrics','Clutter','Cogl','GObject','Shell','FROST_DECLARATIONS','FROST_CODE','framebufferCapture','BlurBuffer','console',source+'\nreturn FrostEffect;')(
+    GLib,snapshotBudget,CaptureMetrics,{EffectPaintFlags:{ACTOR_DIRTY:1,BYPASS_EFFECT:2}},types,{registerClass:(_meta,cls)=>cls},{GLSLEffect:Parent},
     FROST_DECLARATIONS,FROST_CODE,framebufferCapture,class{render(texture){filters++;return texture;}},{error:()=>fallback++});
 const effect=new Effect();
 let width=100,height=80,scale=1,clone=false;
@@ -109,3 +110,32 @@ assert(allocations===7&&draws===14,'Stable reduction levels reuse every intermed
 GLib.file_set_contents('/tmp/polished-frost-shader.json',JSON.stringify({declarations:FROST_DECLARATIONS,code:FROST_CODE,
     filterDeclarations:blur.FILTER_DECLARATIONS,downsample:blur.DOWNSAMPLE_CODE,blur:blur.BLUR_CODE}));
 print('Cached-only capture, GPU storage, geometry/scale, clone safety, fallback, uniforms and bounded filtering checks passed');
+// A straddling window must preserve both framebuffer caches, including scales
+// that cannot be represented as an integer number of device pixels per unit.
+effect._actor.is_mapped = () => false;
+Effect.setWorkspaceMotion(true);
+assert(!effect.canReleaseSnapshot({}), 'Workspace animations protect hidden cached materials from eviction');
+Effect.setWorkspaceMotion(false);
+Effect.setInteractiveMotion(true);
+assert(!effect.canReleaseSnapshot({}), 'Interactive motion protects cached materials from eviction');
+Effect.setInteractiveMotion(false);
+assert(effect.canReleaseSnapshot({}), 'Hidden settled materials can be reclaimed');
+effect.releaseSnapshots();
+assert(effect._sources.size === 0 && !effect._texture && !effect._capture && !effect._boundBackdrop,
+    'Detaching glass releases snapshot storage and the pipeline texture binding');
+for (const fractional of [1, 1.25, 1.5, 1.75, 2]) {
+    scale = fractional; width = 101; height = 81;
+    const capture = framebufferCapture(framebuffer, width, height);
+    assert(Math.abs(capture.scale - fractional) < 0.0001, 'Fractional monitor scale follows the actual framebuffer');
+    assert(capture.rect.width >= width * fractional - 0.001 && capture.rect.width <= width * fractional + 2,
+        'Fractional pixel bounds cover the complete surface with at most edge rounding');
+}
+const clipped = {...framebuffer, get_modelview_matrix: () => {
+    const matrix = new Graphene.Matrix();
+    matrix.init_translate(new Graphene.Point3D({x: -10.25, y: -4.5, z: 0}));
+    return matrix;
+}};
+scale = 1.25;
+const clippedCapture = framebufferCapture(clipped, 101, 81);
+assert(clippedCapture.rect.x === 0 && clippedCapture.rect.y === 0 && clippedCapture.origin.every(value => value < 0),
+    'Monitor-edge clipping retains the subpixel origin instead of shifting the glass');

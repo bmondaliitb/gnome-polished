@@ -29,7 +29,8 @@ const row=new Actor('popup-menu-item'),submenu=new Actor('popup-sub-menu',[new A
 const floating=new Actor('popup-sub-menu'),floatingPointer=new Actor('popup-menu-boxpointer',[floating]);
 const calendar=new Actor('calendar'),card=new Actor('events-button');
 const menu=new Actor('popup-menu-content',[row,submenu,floatingPointer,calendar,card]);
-const dateMenu=new Actor('popup-menu-content datemenu-popover');
+const dateMessage=new Actor('message');
+const dateMenu=new Actor('popup-menu-content datemenu-popover',[new Actor('message-list',[dateMessage])]);
 const quickSettings=new Actor('popup-menu-content quick-settings');
 const pointer=new Actor('popup-menu-boxpointer',[menu]);let repaints=0;pointer._border={queue_repaint:()=>repaints++};
 const orphan=new Actor('popup-menu-boxpointer',[new Actor('unknown-tray-content')]);
@@ -59,6 +60,8 @@ assert(orphan.style.includes('-arrow-background-color: rgba(25,28,35,0.76)'),'Un
 assert(calendar.style.includes('transparent')&&card.style.includes('transparent')&&!calendar.effects.length&&
     looseCalendar.style==='border-radius: 8px;','Calendar inset clearing stays scoped');
 assert(message.style.includes('transparent')&&banner.effects.length===1,'Notifications share a single backdrop');
+assert(!dateMessage.style.includes('background-color:') && dateMessage.effects.length===0,
+    'Date-menu notification cards use CSS hover/focus states without another capture or forced inline fill');
 assert(menu.style.includes('border-color: rgba(')&&!menu.style.includes('border: 1px'),'Native border geometry is preserved');
 assert(dock.style.includes('box-shadow: inset 0 0 0 1px rgba(')&&
     !dock.style.includes('border-width:')&&!dock.style.includes('border-radius: 12px'),
@@ -88,11 +91,24 @@ context.powerSaver=true;context.dockGlass=false;manager.refresh();
 assert(dock.effects.length===0&&dock.style.includes('background-color: rgba(')&&menu.effects.length===1,
     'Power Saver retains dock tint and transient menu frost');
 context.powerSaver=false;context.dockGlass=true;manager.refresh();assert(dock.effects.length===1,'Leaving Power Saver restores dock frost');
-manager.setMotionPaused(true);assert(tracked.size===0,'Workspace motion releases broad redraw protection');
-manager.setMotionPaused(false);assert(tracked.has(menu),'Workspace completion restores protection for live captures');
+const trackedBeforeMotion=tracked.size,menuBeforeMotion=menu.effects[0];
+manager.setMotionPaused(true);manager.setMotionPaused(false);
+assert(tracked.size===trackedBeforeMotion&&tracked.has(menu)&&menu.effects[0]===menuBeforeMotion,
+    'Workspace pause/resume preserves effect records and observers without untracking and rearming every surface');
 const oldTheme=menu.get_theme_node;menu.get_theme_node=undefined;manager.refresh();
 assert(menu.effects.length===0&&menu.style.includes('rgba('),'Unknown native shape remains corner-safe tint');
 menu.get_theme_node=oldTheme;manager.refresh();
+const clones=new Actor('workspace-animation-group',[new Actor('',[new Actor('')])]);
+root.children.push(clones);root.emit('child-added',clones);
+assert(callbacks.size===0,'Adding a workspace clone group without material surfaces does not schedule a full Shell refresh');
+root.children=root.children.filter(child=>child!==clones);root.emit('child-removed',clones);
+assert(callbacks.size===0&&clones.signals.size===0,'Removing clone groups avoids refresh work and releases discovery handlers');
+manager.setMotionPaused(true);
+const duringMotion=new Actor('popup-menu-content');root.children.push(duringMotion);root.emit('child-added',duringMotion);flush();
+assert(callbacks.size===0&&duringMotion.effects.length===0,'Material discovery waits while a workspace is moving');
+manager.setMotionPaused(false);flush();
+assert(duringMotion.effects.length===1,'A real popup discovered during motion receives its material after resume');
+root.children=root.children.filter(child=>child!==duringMotion);root.emit('child-removed',duringMotion);flush();
 const dynamic=new Actor('popup-menu-content');root.children.push(dynamic);root.emit('child-added',dynamic);flush();
 assert(dynamic.effects.length===1,'New surfaces are discovered without polling');
 root.children=root.children.filter(child=>child!==dynamic);root.emit('child-removed',dynamic);

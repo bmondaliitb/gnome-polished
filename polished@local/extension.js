@@ -22,6 +22,7 @@ import {OverviewMaterial} from './overviewMaterial.js';
 import {LockMaterial} from './lockMaterial.js';
 import {readDesktopStyle} from './polish.js';
 import {arrangeWindow} from './windowLayout.js';
+import {WorkspaceResume} from './workspaceResume.js';
 import {initializeProfile, materialValues} from './simpleProfile.js';
 
 export default class Polished extends Extension {
@@ -31,12 +32,17 @@ export default class Polished extends Extension {
             throw new Error('Disable Prism Materials before enabling Polished Desktop.');
         this._settings = this.getSettings();
         initializeProfile(this._settings);
+        FrostEffect.configureDiagnostics?.(this._settings.get_boolean('capture-diagnostics'));
         this._interface = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
         configureMaterials(readDesktopStyle(this._interface));
         this._connections = [];
         this._windows = new Map();
         this._workspaceMotion = false;
         this._motionSignal = 0;
+        this._workspaceSettling = false;
+        this._workspaceDirtyWindows = new Set();
+        this._workspaceFullRefresh = false;
+        this._workspaceResume = new WorkspaceResume(global.stage, () => this._finishWorkspaceMotion());
         this._layoutBindings = [];
         for (const [name, resize] of [['polished-center-window', false], ['polished-comfortable-window', true]]) {
             Main.wm.addKeybinding(name, this._settings, Meta.KeyBindingFlags.NONE, Shell.ActionMode.NORMAL, () => {
@@ -45,7 +51,7 @@ export default class Polished extends Extension {
             });
             this._layoutBindings.push(name);
         }
-        this._redrawGuard = new RedrawGuard(() => global.stage.queue_redraw());
+        this._redrawGuard = new RedrawGuard(() => global.stage.queue_redraw(), undefined, undefined, FrostEffect.metrics);
         this._gtkMenus = new GtkMenuStyle();
         this._gtkCss = undefined;
         this._button = new PanelMenu.Button(0.0, 'Polished Materials');
@@ -67,7 +73,12 @@ export default class Polished extends Extension {
             catch (error) { console.error('Polished: could not open preferences', error); }
         });
         Main.panel.addToStatusArea(this.uuid, this._button);
-        this._connect(this._settings, 'changed', () => {
+        this._connect(this._settings, 'changed', (_settings, key) => {
+            if (key === 'capture-diagnostics') {
+                FrostEffect.configureDiagnostics?.(this._settings.get_boolean(key));
+                return;
+            }
+            if (key?.startsWith('polished-')) return;
             this._toggle.setToggleState(this._settings.get_boolean('enabled'));
             this._syncMotionTracking();
             this._syncGtkMenus();
@@ -179,6 +190,15 @@ export default class Polished extends Extension {
     }
 
     _refresh(shell = true) {
+        this._syncWorkspaceMotion();
+        if ((this._workspaceMotion || this._workspaceSettling) &&
+            this._settings.get_boolean('enabled') && !this._reduced()) {
+            this._workspaceFullRefresh = true;
+            return;
+        }
+        if (this._workspaceFullRefresh) shell = true;
+        this._workspaceFullRefresh = false;
+        this._workspaceDirtyWindows?.clear();
         if (this._button) {
             this._button.visible = this._settings.get_boolean('show-panel-indicator') && !Main.sessionMode.isLocked;
             if (Main.sessionMode.isLocked) this._button.menu.close();
@@ -192,7 +212,7 @@ export default class Polished extends Extension {
 
     _refreshFocus() {
         this._syncWorkspaceMotion();
-        if (this._workspaceMotion || Main.sessionMode.isLocked) return;
+        if (this._workspaceMotion || this._workspaceSettling || Main.sessionMode.isLocked) return;
         const focus = global.display.focus_window;
         // Focus changes need only the old/new focus families. Do not refresh
         // the overview, scan Shell actors, or rewrite unrelated window rims.
@@ -209,7 +229,7 @@ export default class Polished extends Extension {
             (context.windowGlass || context.dockGlass) && !this._reduced();
         if (needed && !this._motionSignal) {
             this._motionSignal = global.stage.connect('before-paint', () => {
-                if (this._syncWorkspaceMotion() && !this._workspaceMotion) this._refresh();
+                this._syncWorkspaceMotion();
             });
         } else if (!needed && this._motionSignal) {
             global.stage.disconnect(this._motionSignal);
@@ -218,25 +238,68 @@ export default class Polished extends Extension {
         }
     }
 
+    _setWorkspacePaused(paused) {
+        FrostEffect.setWorkspaceMotion(paused);
+        this._redrawGuard?.setSuspended(paused);
+        this._shellSurfaces?.setMotionPaused(paused);
+    }
+
     _syncWorkspaceMotion() {
-        // GNOME 50 uses this controller for keyboard switches and touchpad
-        // gestures, including cancellation. Observe it without wrapping methods.
-        // The observer is installed only when the current power policy needs
-        // workspace capture protection. Keep this per-frame check allocation-free.
+        // Observe GNOME's controller without wrapping its animation methods.
         const active = Boolean(this._motionSignal && Main.wm?._workspaceAnimation?._switchData);
-        if (Boolean(this._workspaceMotion) === active) return false;
+        if (Boolean(this._workspaceMotion) === active) {
+            if (!this._motionSignal && this._workspaceSettling) {
+                this._workspaceResume?.cancel();
+                this._workspaceSettling = false;
+                this._setWorkspacePaused(false);
+            }
+            return false;
+        }
         this._workspaceMotion = active;
-        FrostEffect.setWorkspaceMotion(active);
-        this._redrawGuard?.setSuspended(active);
-        this._shellSurfaces?.setMotionPaused(active);
+        if (active) {
+            this._workspaceResume?.cancel();
+            this._workspaceSettling = false;
+            this._setWorkspacePaused(true);
+        } else if (this._motionSignal) {
+            this._workspaceSettling = true;
+            this._workspaceResume.schedule();
+        } else {
+            this._workspaceResume?.cancel();
+            this._workspaceSettling = false;
+            this._setWorkspacePaused(false);
+        }
         return true;
+    }
+
+    _finishWorkspaceMotion() {
+        if (!this._settings) return;
+        this._syncWorkspaceMotion();
+        if (this._workspaceMotion) return;
+        this._workspaceSettling = false;
+        this._setWorkspacePaused(false);
+        const dirty = [...this._workspaceDirtyWindows];
+        this._workspaceDirtyWindows.clear();
+        if (this._workspaceFullRefresh) {
+            this._workspaceFullRefresh = false;
+            this._refresh();
+        } else {
+            // A normal switch changes focus, not every material on the desktop.
+            for (const actor of dirty) {
+                const state = this._windows.get(actor);
+                if (state) this._update(actor, state);
+            }
+            this._refreshFocus();
+        }
     }
 
     _update(actor, state) {
         state.actor ??= actor;
         // Focus/geometry notifications during a slide must not tear down and
         // rebuild materials on the source windows used by animation clones.
-        if (this._workspaceMotion && this._settings.get_boolean('enabled') && !this._reduced()) return;
+        if ((this._workspaceMotion || this._workspaceSettling) && this._settings.get_boolean('enabled') && !this._reduced()) {
+            this._workspaceDirtyWindows.add(actor);
+            return;
+        }
         const s = this._settings;
         const w = state.window;
         const type = w.get_window_type();
@@ -415,6 +478,10 @@ export default class Polished extends Extension {
     }
 
     disable() {
+        FrostEffect.configureDiagnostics?.(false);
+        this._workspaceResume?.cancel();
+        this._workspaceResume = null;
+        this._workspaceDirtyWindows?.clear();
         if (this._motionSignal) global.stage.disconnect(this._motionSignal);
         this._motionSignal = 0;
         for (const name of this._layoutBindings ?? []) Main.wm.removeKeybinding(name);
