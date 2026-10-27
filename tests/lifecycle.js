@@ -34,6 +34,7 @@ const extension=new Polished();extension._settings=memorySettings();initializePr
 extension._settings.set_boolean('smooth-performance',false);
 extension._motionSignal=1; // Isolated window tests simulate the glass observer.
 extension._interface={get_string:()=> 'prefer-dark'};
+extension._redrawGuard={track:(_actor,on,_effect,protect)=>protect?.(on),untrack(){}};
 const surface={opacity:240,effects:[],constructor:{$gtype:'MetaSurfaceContainerActorWayland'},
     add_effect(effect){this.effects.push(effect);},remove_effect(effect){this.effects=this.effects.filter(item=>item!==effect);}};
 const decoration={opacity:255,constructor:{$gtype:'OtherExtensionDecoration'}};
@@ -103,7 +104,7 @@ extension._settings.set_int('material-strength',0);extension._syncGtkMenus();
 assert(writes===2,'Derived density changes update matching GTK menus');
 extension._syncGtkMenus(true);assert(writes===3,'Disable removes owned GTK styles');
 let suspended=false,paused=false,shellScans=0;
-extension._redrawGuard={setSuspended:value=>suspended=value,track(){},untrack(){}};
+extension._redrawGuard={setSuspended:value=>suspended=value,track:(_actor,on,_effect,protect)=>protect?.(on),untrack(){}};
 extension._shellSurfaces={refresh:()=>shellScans++,setMotionPaused:value=>paused=value};
 extension._windows=new Map();extension._refresh(false);assert(shellScans===0,'Focus refresh avoids scanning the Shell tree');
 extension._settings.set_int('material-strength',50);extension._update(actor,state);extension._windows.set(actor,state);

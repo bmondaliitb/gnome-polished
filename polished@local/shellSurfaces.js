@@ -175,7 +175,7 @@ export class ShellSurfaces {
         if (Boolean(this._motionPaused) === paused) return;
         this._motionPaused = paused;
         for (const [actor, saved] of this._applied) {
-            this._redrawGuard?.track(actor, Boolean(saved.effect) && !paused);
+            this._redrawGuard?.track(actor, Boolean(saved.effect) && !paused, saved.effect);
         }
     }
 
@@ -243,7 +243,7 @@ export class ShellSurfaces {
                     actor.queue_redraw?.();
                 }
             }
-            this._redrawGuard?.track(actor, Boolean(saved.effect) && !this._motionPaused);
+            this._redrawGuard?.track(actor, Boolean(saved.effect) && !this._motionPaused, saved.effect);
             // Theme !important rules (notably Yaru #panel) otherwise keep opaque paint.
             // BoxPointer paints its own Cairo background beneath popup-menu-content.
             // Without blur, denser fills keep wallpaper detail from competing

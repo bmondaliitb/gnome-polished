@@ -34,14 +34,30 @@ class FrostEffect extends Shell.GLSLEffect {
         this._blurBuffer = null;
         this._blurred = null;
         this._uniforms = new Map();
+        this._uniformValues = new Map();
+        this._pendingCapture = true;
+        this.captureAllowed = false;
+        this.captureChanged = null;
     }
 
     vfunc_build_pipeline() {
         this.add_glsl_snippet(Cogl.SnippetHook.FRAGMENT, FROST_DECLARATIONS, FROST_CODE, false);
     }
 
+    get needsCapture() { return this._pendingCapture; }
+
+    _setPending(pending, request = false) {
+        if (this._pendingCapture === pending) {
+            if (request) this.captureChanged?.();
+            return;
+        }
+        this._pendingCapture = pending;
+        this.captureChanged?.();
+    }
+
     invalidateBackdrop() {
         this._cacheVersion++;
+        this._setPending(true, true);
         this.queue_repaint();
     }
 
@@ -67,6 +83,8 @@ class FrostEffect extends Shell.GLSLEffect {
     }
 
     _updateBackdrop(context) {
+        const previous = {capture: this._capture, texture: this._texture,
+            framebuffer: this._framebuffer, blurBuffer: this._blurBuffer, blurred: this._blurred};
         this._capture = null;
         try {
             const actor = this.get_actor();
@@ -88,10 +106,23 @@ class FrostEffect extends Shell.GLSLEffect {
                 this._blurred = cached.blurred;
                 if (cached.signature === signature) {
                     this._capture = capture;
+                    this._setPending(false);
                     return true;
                 }
             } else {
                 this._texture = this._framebuffer = this._blurBuffer = null;
+            }
+            if (this.captureChanged && !this.captureAllowed) {
+                // A transform/size change may first be observed during paint.
+                // Reuse the old snapshot for this frame and request a complete
+                // backing frame before copying; never read a partial damage tile.
+                this._texture = previous.texture;
+                this._framebuffer = previous.framebuffer;
+                this._blurBuffer = previous.blurBuffer;
+                this._blurred = previous.blurred;
+                this._capture = previous.capture;
+                this._setPending(true, true);
+                return Boolean(this._capture);
             }
             // Capture only the effect's bounds. Allocation padding can reach
             // outside the region repainted by Mutter; filtering those pixels
@@ -112,8 +143,10 @@ class FrostEffect extends Shell.GLSLEffect {
                 blurred: this._blurred});
             // Bound storage if transient offscreen targets keep appearing.
             if (this._sources.size > 4) this._sources.delete(this._sources.keys().next().value);
+            this._setPending(false);
             return true;
         } catch (error) {
+            this._setPending(false);
             this._report(error);
             return false;
         }
@@ -124,13 +157,22 @@ class FrostEffect extends Shell.GLSLEffect {
         if (this._uniformPipeline !== pipeline) {
             this._uniformPipeline = pipeline;
             this._uniforms.clear();
+            this._uniformValues.clear();
+            this._boundBackdrop = null;
+            pipeline.set_layer_combine(1, 'RGBA = REPLACE (PREVIOUS)');
+            pipeline.set_layer_filters(1, Cogl.PipelineFilter.LINEAR, Cogl.PipelineFilter.LINEAR);
+            pipeline.set_layer_wrap_mode(1, Cogl.PipelineWrapMode.CLAMP_TO_EDGE);
+            pipeline.set_blend('RGBA = ADD (SRC_COLOR, DST_COLOR * (1-SRC_COLOR[A]))');
         }
         const uniform = (name, components, values) => {
+            const previous = this._uniformValues.get(name);
+            if (previous && values.every((value, index) => value === previous[index])) return;
             // Pipeline.set_uniform_float has an explicit vector count in GJS.
             if (!this._uniforms.has(name)) this._uniforms.set(name, pipeline.get_uniform_location(name));
             pipeline.set_uniform_float(this._uniforms.get(name), components, 1, values);
+            this._uniformValues.set(name, [...values]);
         };
-        uniform('polishedActive', 1, [0]);
+        let active = false;
         try {
             if (this._capture) {
                 const actor = this.get_actor();
@@ -141,11 +183,10 @@ class FrostEffect extends Shell.GLSLEffect {
                 const texHeight = texture.get_height() / resourceScale;
                 const {rect, basis, origin} = this._capture;
                 // This effect owns its per-instance GLSL pipeline, including layer 1.
-                pipeline.set_layer_texture(1, this._blurred);
-                pipeline.set_layer_combine(1, 'RGBA = REPLACE (PREVIOUS)');
-                pipeline.set_layer_filters(1, Cogl.PipelineFilter.LINEAR, Cogl.PipelineFilter.LINEAR);
-                pipeline.set_layer_wrap_mode(1, Cogl.PipelineWrapMode.CLAMP_TO_EDGE);
-                pipeline.set_blend('RGBA = ADD (SRC_COLOR, DST_COLOR * (1-SRC_COLOR[A]))');
+                if (this._boundBackdrop !== this._blurred) {
+                    pipeline.set_layer_texture(1, this._blurred);
+                    this._boundBackdrop = this._blurred;
+                }
                 uniform('polishedSize', 2, [Math.max(1, width), Math.max(1, height)]);
                 uniform('polishedTexSize', 2, [texWidth, texHeight]);
                 uniform('polishedPadding', 2, [(texWidth - width) / 2, (texHeight - height) / 2]);
@@ -158,12 +199,12 @@ class FrostEffect extends Shell.GLSLEffect {
                 uniform('polishedVeil', 4, this.veil);
                 uniform('polishedNativeShape', 1, [this.nativeShape ? 1 : 0]);
                 uniform('polishedNativeTintOpacity', 1, [this.clientTintOpacity]);
-                uniform('polishedActive', 1, [1]);
+                active = true;
             }
         } catch (error) {
-            uniform('polishedActive', 1, [0]);
             this._report(error);
         }
+        uniform('polishedActive', 1, [active ? 1 : 0]);
         super.vfunc_paint_target(node, context);
     }
 });

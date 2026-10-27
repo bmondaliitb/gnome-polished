@@ -346,17 +346,19 @@ export default class Polished extends Extension {
             state.popupEffect?.invalidateBackdrop?.();
         }
         state.cachedFocus = focused;
-        // The frost layer is a child of MetaWindowActor. Without an effect on
-        // the window actor itself, Mutter can cull/clip the windows below it and
-        // our full-rectangle capture can contain stale damage tiles.
-        if (hasFrost && !state.refreshEffect) {
-            state.refreshEffect = new BackdropRefreshEffect();
-            actor.add_effect(state.refreshEffect);
-        } else if (!hasFrost && state.refreshEffect) {
-            actor.remove_effect(state.refreshEffect);
-            state.refreshEffect = null;
-        }
-        this._redrawGuard?.track(state.layer ?? state.surface, hasFrost);
+        // Culling protection is needed only while refreshing a snapshot.
+        // RedrawGuard releases it after that paint; steady cached glass keeps
+        // Mutter's normal culling path rather than forcing all windows through.
+        this._redrawGuard?.track(state.layer ?? state.surface, hasFrost,
+            state.effect ?? state.popupEffect, capture => {
+                if (capture && !state.refreshEffect) {
+                    state.refreshEffect = new BackdropRefreshEffect();
+                    actor.add_effect(state.refreshEffect);
+                } else if (!capture && state.refreshEffect) {
+                    actor.remove_effect(state.refreshEffect);
+                    state.refreshEffect = null;
+                }
+            });
         let opacity = isPopup ? context.popupOpacity : context.windowOpacity;
         if (isDialog) opacity = Math.max(99, opacity);
         else if (!isPopup && !focused) opacity = Math.max(98, opacity);

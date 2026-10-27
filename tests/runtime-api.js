@@ -20,6 +20,9 @@ for (const name of ['grab-op-begin', 'grab-op-end']) {
 }
 check(Meta.Window, ['allows_move', 'allows_resize', 'is_maximized', 'unmaximize', 'is_override_redirect',
     'get_work_area_current_monitor', 'move_frame', 'move_resize_frame']);
+GObject.type_class_ref(Clutter.Stage);
+for(const signal of ['before-paint','after-paint'])
+    if(!GObject.signal_lookup(signal,Clutter.Stage))throw new Error('Missing stage capture lifecycle signal '+signal);
 check(Clutter.PaintContext, ['get_framebuffer']);
 check(Clutter.Actor, ['continue_pick', 'get_size', 'get_resource_scale', 'get_paint_opacity']);
 check(Clutter.Actor, ['continue_paint', 'add_effect', 'remove_effect']);

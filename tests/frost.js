@@ -5,10 +5,10 @@ import {FROST_DECLARATIONS,FROST_CODE} from '../polished@local/frostShader.js';
 function assert(value,message){if(!value)throw new Error(message);}
 const [,bytes]=GLib.file_get_contents('polished@local/frostEffect.js');
 const source=new TextDecoder().decode(bytes).replace(/^import .*;\n/gm,'').replace('export const FrostEffect','const FrostEffect');
-const uniforms=new Map();let copies=0,filters=0,queued=0,fallback=0,flagsSeen=-1;
+const uniforms=new Map();let copies=0,filters=0,queued=0,fallback=0,flagsSeen=-1,uploads=0,bindings=0;
 const pipeline={get_uniform_location:name=>name,set_uniform_float:(name,n,count,values)=>{
-    assert(values.length===n*count,'Uniform vector shape');uniforms.set(name,values);
-},set_layer_texture(){},set_layer_combine(){},set_layer_filters(){},set_layer_wrap_mode(){},set_blend(){}};
+    assert(values.length===n*count,'Uniform vector shape');uploads++;uniforms.set(name,values);
+},set_layer_texture(){bindings++;},set_layer_combine(){},set_layer_filters(){},set_layer_wrap_mode(){},set_blend(){}};
 class Parent {
     constructor(){this._init();}_init(){}
     get_actor(){return this._actor;}get_pipeline(){return pipeline;}
@@ -34,6 +34,9 @@ const context={get_framebuffer:()=>framebuffer};
 assert(effect._updateBackdrop(context),'Actual framebuffer matrices activate the backdrop without private StageView APIs');
 effect.vfunc_paint_target(null,context);
 assert(copies===1&&filters===1&&uniforms.get('polishedActive')[0]===1&&!fallback,'First capture/filter and shader activation');
+const initialUploads=uploads,initialBindings=bindings;
+for(let i=0;i<120;i++)effect.vfunc_paint_target(null,context);
+assert(uploads===initialUploads&&bindings===initialBindings,'Steady cached glass uploads no unchanged shader uniforms or backdrop texture bindings');
 const original=effect._texture;
 for(let i=0;i<120;i++)effect.vfunc_paint(null,context,0);
 assert(copies===1&&filters===1&&effect._texture===original&&flagsSeen===0,
@@ -76,6 +79,14 @@ framebuffer.blit=originalBlit;effect._updateBackdrop(context);
 effect.nativeShape=true;effect.clientTintOpacity=0.74;effect.vfunc_paint_target(null,context);
 assert(uniforms.get('polishedNativeShape')[0]===1&&uniforms.get('polishedNativeTintOpacity')[0]===0.74,
     'Popup alpha-shape and expanded fill opacity reach the shader');
+let captureRequests=0;effect.captureChanged=()=>captureRequests++;effect.captureAllowed=false;
+effect.invalidateBackdrop();const beforeGuardedCopy=copies;
+effect._updateBackdrop(context);
+assert(copies===beforeGuardedCopy&&effect.needsCapture&&captureRequests>0&&effect._capture,
+    'Managed refresh defers framebuffer copies and reuses the previous snapshot until full backing pixels are prepared');
+effect.captureAllowed=true;effect._updateBackdrop(context);
+assert(copies===beforeGuardedCopy+1&&!effect.needsCapture,'A prepared frame refreshes the backdrop exactly once');
+effect.captureChanged=null;effect.captureAllowed=false;
 effect.vfunc_pick({});assert(effect.picked,'Material picking always delegates to the native actor');
 
 const [,blurBytes]=GLib.file_get_contents('polished@local/frostBlur.js');
