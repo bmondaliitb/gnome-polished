@@ -240,16 +240,22 @@ export class ShellSurfaces {
                 saved.paintKey = null;
                 if (saved.effect) actor.add_effect(saved.effect);
             }
+            const nativeAlpha = Math.max(0.76, surfaceOpacity(kind, alpha));
             if (saved.effect) {
+                // Keep native coverage above the shape-mask threshold, then
+                // reduce only translucent background pixels in the existing shader.
+                // Labels/icons remain sharp and transparent margins stay clear.
+                saved.effect.clientTintOpacity = Math.max(0.70,
+                    surfaceOpacity(kind, alpha, true) / nativeAlpha);
                 // St offscreen textures include transparent layout margins and
                 // shadow extents. Glass must follow the native painted alpha,
                 // not fill the actor's entire rounded allocation behind them.
                 saved.effect.nativeShape = true;
                 saved.effect.radii = radii;
                 saved.effect.radius = 36;
-                saved.effect.brightness = dark ? 0.85 : 1;
-                saved.effect.veil = [...(dark ? [0.10, 0.11, 0.14] : [0.94, 0.95, 0.97]), context.detail / 100];
-                const paintKey = JSON.stringify([radii, saved.effect.brightness, saved.effect.veil]);
+                saved.effect.brightness = dark ? 0.90 : 1;
+                saved.effect.veil = [...(dark ? [0.10, 0.11, 0.14] : [0.94, 0.95, 0.97]), context.detail * 0.8 / 100];
+                const paintKey = JSON.stringify([radii, saved.effect.brightness, saved.effect.veil, saved.effect.clientTintOpacity]);
                 if (saved.paintKey !== paintKey) {
                     saved.paintKey = paintKey;
                     actor.queue_redraw?.();
@@ -261,7 +267,8 @@ export class ShellSurfaces {
             // Without blur, denser fills keep wallpaper detail from competing
             // with labels. The top bar retains its wallpaper-aware contrast.
             const materialAlpha = !glass
-                ? Math.max(0.94, surfaceOpacity(kind, alpha)) : surfaceOpacity(kind, alpha);
+                ? Math.max(0.94, surfaceOpacity(kind, alpha))
+                : saved.effect ? nativeAlpha : surfaceOpacity(kind, alpha);
             const background = role === 'surface'
                 ? (kind === 'panel' ? `rgba(${panelTint},${panelAlpha})`
                     : `rgba(${kind === 'overlays' ? surfacePalette(true).background : tint},${materialAlpha})`) : 'transparent';
@@ -283,9 +290,9 @@ export class ShellSurfaces {
             // width. It follows native radii without changing allocation, icon
             // spacing, input regions or adding another capture/effect actor.
             const edge = role === 'surface' && kind === 'dock'
-                ? `border-color: transparent; box-shadow: inset 0 0 0 1px rgba(${palette.edge}) !important;`
+                ? `border-color: transparent; box-shadow: inset 0 0 0 1px rgba(${saved.effect ? palette.glassEdge : palette.edge}) !important;`
                 : role === 'surface' && kind !== 'panel'
-                    ? `border-color: rgba(${kind === 'overlays' ? surfacePalette(true).edge : palette.edge}); box-shadow: 0 ${kind === 'overlays' ? '4px 12px' : '6px 18px'} 0 rgba(0,0,0,${kind === 'overlays' || dark ? 0.24 : 0.14});` : '';
+                    ? `border-color: rgba(${kind === 'overlays' ? surfacePalette(true).edge : palette.edge}); ${saved.effect ? `border-top-color: rgba(${palette.glassEdge});` : ''} box-shadow: 0 ${kind === 'overlays' ? '4px 12px' : '6px 18px'} 0 rgba(0,0,0,${kind === 'overlays' || dark ? 0.24 : 0.14});` : '';
             saved.appliedStyle = `${base}${base && !base.endsWith(';') ? ';' : ''} ${fill} ${foreground} ${edge} ${font}`;
             if (actor.get_style() !== saved.appliedStyle) {
                 this._settingStyle = true;

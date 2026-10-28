@@ -193,6 +193,29 @@ lower_fill=render(24)[(32*64+32)*4]
 uniform1(loc(program,b'polishedNativeTintOpacity'),0.75)
 upper_fill=render(24)[(32*64+32)*4]
 assert upper_fill-lower_fill>=3, 'Custom popup translucency must not be silently clamped at 75%'
+# The lighter floating-material weights must expose more blurred color while
+# keeping final surface coverage opaque, including the dock's native-alpha floor.
+center=(32*64+32)*4
+for tint,desired in [(0.76,0.68),(0.81,0.73),(0.76,0.60)]:
+ set4(loc(program,b'sourceColor'),1,(F*4)(0.1*tint,0.11*tint,0.14*tint,tint))
+ contrasts=[]
+ for weight in [1,desired/tint]:
+  uniform1(loc(program,b'polishedNativeTintOpacity'),weight)
+  values=[]
+  for bg in [0,255]:
+   bindTexture(0x0DE1,texture)
+   solid=(C.c_ubyte*(64*64*4))(*([bg,bg,bg,255]*(64*64)))
+   bind(G,'glTexImage2D',None,U,I,I,I,I,I,U,U,P)(0x0DE1,0,0x1908,64,64,0,0x1908,0x1401,solid)
+   result=render(24)
+   assert result[center+3]==255, 'Lighter glass must not expose sharp content through partial coverage'
+   values.append(result[center])
+  contrasts.append(values[1]-values[0])
+ assert contrasts[1]>contrasts[0]+10, 'Lighter tint must reveal measurably more blurred background color'
+set4(loc(program,b'sourceColor'),1,(F*4)(1,1,1,1))
+assert render(24)[center:center+4]==[255,255,255,255], 'Lighter material must not fade opaque labels'
+set4(loc(program,b'sourceColor'),1,(F*4)(0,0,0,0))
+assert all(value==0 for value in render(24)), 'Lighter material must not restore the unwanted popup backing slab'
+uniform1(loc(program,b'polishedNativeTintOpacity'),1)
 # Test the full normal-window composition, not just the backdrop shader. An
 # opaque app faded over the material can hide nearly all of a correct blur.
 with open('/tmp/polished-profile-default.json') as stream:

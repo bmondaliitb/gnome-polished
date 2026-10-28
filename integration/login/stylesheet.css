@@ -1,0 +1,69 @@
+/* One opaque card around the native authentication prompt. No effect actors.
+ * Leave fields, feedback, errors, focus rings and verification in GDM's control. */
+.polished-minimum-login .login-dialog > .login-dialog-prompt-layout {
+    background-color: #292d36;
+    color: #f2f2f2;
+    border: 1px solid #484d58;
+    border-radius: 24px;
+    padding: 24px;
+    box-shadow: none;
+}
+.polished-minimum-login .login-dialog .login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item {
+    background-color: #292d36;
+    color: #f2f2f2;
+    border-radius: 18px;
+}
+.polished-minimum-login .login-dialog .login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item:hover {
+    background-color: #363c48;
+}
+.polished-minimum-login .login-dialog .login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item:focus,
+.polished-minimum-login .login-dialog .login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item:selected {
+    background-color: st-mix(-st-accent-color, #292d36, 20%);
+}
+
+/* Harmonize the account-name tile and the name above the password prompt.
+ * Scope stays on the companion's root; High Contrast removes that scope. */
+.polished-minimum-login .login-dialog .login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item {
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.18);
+}
+.polished-minimum-login .login-dialog .login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item .user-widget-label {
+    font-weight: 500;
+    color: #f2f2f2;
+}
+.polished-minimum-login .login-dialog .login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item:hover {
+    background-color: #343943;
+}
+.polished-minimum-login .login-dialog .login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item:focus,
+.polished-minimum-login .login-dialog .login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item:selected,
+.polished-minimum-login .login-dialog .login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item:focus:hover,
+.polished-minimum-login .login-dialog .login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item:selected:hover {
+    background-color: st-mix(-st-accent-color, #292d36, 16%);
+    box-shadow: inset 0 0 0 2px st-transparentize(-st-accent-color, 0.25) !important;
+}
+.polished-minimum-login .login-dialog .login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item:active,
+.polished-minimum-login .login-dialog .login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item:active:hover,
+.polished-minimum-login .login-dialog .login-dialog-user-list-view .login-dialog-user-list .login-dialog-user-list-item:active:focus {
+    background-color: st-mix(-st-accent-color, #292d36, 22%);
+}
+.polished-minimum-login .login-dialog .user-widget.vertical .user-widget-label {
+    font-weight: 500;
+    font-size: 1.364em;
+    margin-bottom: 0.5em;
+    color: #f2f2f2;
+}
+.polished-minimum-login .login-dialog .login-dialog-prompt-entry {
+    background-color: rgba(255, 255, 255, 0.06);
+    color: #f2f2f2;
+    border-radius: 10px;
+    font-weight: 400;
+}
+.polished-minimum-login .login-dialog .login-dialog-prompt-entry:hover { background-color: rgba(255, 255, 255, 0.10); }
+.polished-minimum-login .login-dialog .login-dialog-prompt-entry:focus {
+    background-color: rgba(255, 255, 255, 0.12);
+    box-shadow: inset 0 0 0 2px st-transparentize(-st-accent-color, 0.25) !important;
+}
+.polished-minimum-login .login-dialog .login-dialog-prompt-entry:insensitive {
+    background-color: rgba(255, 255, 255, 0.035);
+    color: rgba(242, 242, 242, 0.4);
+}

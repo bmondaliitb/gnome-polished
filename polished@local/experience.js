@@ -12,9 +12,12 @@ export function comfortPolicy(state, automatic, manual = false, battery = {}) {
         dockGlass: enabled('dock'), overviewGlass: enabled('overview')};
 }
 
-export function surfaceOpacity(kind, alpha) {
+export function surfaceOpacity(kind, alpha, glass = false) {
     const offset = {dialogs: 0.08, notifications: 0.05, dock: -0.1}[kind] ?? 0;
-    return Math.round(Math.max(0.4, Math.min(1, alpha + offset)) * 1000) / 1000;
+    // Fade the tint, not the text. Denser presets keep their clarity advantage.
+    const relief = glass ? ({menus: 0.08, notifications: 0.08, dock: 0.06, dialogs: 0.04}[kind] ?? 0) *
+        Math.max(0, Math.min(1, (1 - alpha) / 0.24)) : 0;
+    return Math.round(Math.max(glass ? 0.56 : 0.4, Math.min(1, alpha + offset - relief)) * 1000) / 1000;
 }
 
 export function panelIsDark(dark, alpha, luminance) {

@@ -1,12 +1,14 @@
 import GLib from 'gi://GLib';
 import St from 'gi://St';
+import {surfacePalette} from './materials.js';
 
 // Reuse GNOME's wallpaper actors and their existing native blur. Never capture
 // session windows or modify authentication, focus, gestures, or entry opacity.
 export class LockMaterial {
-    constructor(shield, permitted) {
+    constructor(shield, permitted, context = () => ({})) {
         this._shield = shield;
         this._permitted = permitted;
+        this._context = context;
         this._effects = new Map();
         this._dialogSignals = [];
         this._theme = St.ThemeContext.get_for_stage(global.stage);
@@ -38,6 +40,8 @@ export class LockMaterial {
         if (this._dialog !== dialog) {
             this._clear();
             this._dialog = dialog;
+            this._ownsClass = !dialog.has_style_class_name('polished-lock-material');
+            if (this._ownsClass) dialog.add_style_class_name('polished-lock-material');
             this._prompt = dialog._promptBox;
             this._dialogSignals = [
                 [dialog, dialog.connect('destroy', () => this._clear())],
@@ -45,9 +49,16 @@ export class LockMaterial {
                 [dialog._backgroundGroup, dialog._backgroundGroup.connect('child-added', () => this._queue())],
             ];
         }
+        const palette = surfacePalette(true);
+        const context = this._context();
+        const alpha = Math.max(0.60, Math.min(0.94, (context.shellOpacity ?? 76) / 100 - 0.12));
+        if (dialog.get_style() !== this._dialogAppliedStyle) this._dialogStyle = dialog.get_style();
+        const dialogBase = this._dialogStyle?.trim() ?? '';
+        this._dialogAppliedStyle = `${dialogBase}${dialogBase && !dialogBase.endsWith(';') ? ';' : ''} ${palette.fontStyle}`;
+        if (dialog.get_style() !== this._dialogAppliedStyle) dialog.set_style(this._dialogAppliedStyle);
         if (this._prompt.get_style() !== this._appliedStyle) this._style = this._prompt.get_style();
         const base = this._style?.trim() ?? '';
-        this._appliedStyle = `${base}${base && !base.endsWith(';') ? ';' : ''} background-color: rgba(25,28,35,0.70); border-radius: 28px; padding: 24px; border: 1px solid rgba(255,255,255,0.14);`;
+        this._appliedStyle = `${base}${base && !base.endsWith(';') ? ';' : ''} background-color: rgba(${palette.background},${context.smoothPerformance || context.menuGlass === false ? 0.94 : alpha}); border-radius: 24px; padding: 24px; border: 1px solid rgba(${palette.edge}); border-top-color: rgba(${palette.glassEdge}); color: rgb(${palette.foreground});`;
         if (this._prompt.get_style() !== this._appliedStyle) this._prompt.set_style(this._appliedStyle);
         const prompting = this._prompt.visible;
         for (const actor of dialog._backgroundGroup.get_children()) {
@@ -68,7 +79,8 @@ export class LockMaterial {
             // the latest native values so opt-out restores the correct scale.
             if (effect.radius !== saved.appliedRadius) saved.radius = effect.radius;
             if (effect.brightness !== saved.appliedBrightness) saved.brightness = effect.brightness;
-            saved.appliedRadius = prompting ? 18 * this._theme.scale_factor : 0;
+            saved.appliedRadius = prompting && !context.smoothPerformance && context.menuGlass !== false
+                ? 18 * this._theme.scale_factor : 0;
             saved.appliedBrightness = prompting ? 0.78 : 1;
             if (effect.radius !== saved.appliedRadius) effect.radius = saved.appliedRadius;
             if (effect.brightness !== saved.appliedBrightness) effect.brightness = saved.appliedBrightness;
@@ -85,6 +97,12 @@ export class LockMaterial {
         for (const [object, id] of this._dialogSignals) object.disconnect(id);
         this._dialogSignals = [];
         if (this._prompt && this._prompt.get_style() === this._appliedStyle) this._prompt.set_style(this._style);
+        if (this._dialog) {
+            if (this._dialog.get_style() === this._dialogAppliedStyle) this._dialog.set_style(this._dialogStyle);
+            if (this._ownsClass) this._dialog.remove_style_class_name('polished-lock-material');
+        }
+        this._ownsClass = false;
+        this._dialogStyle = this._dialogAppliedStyle = null;
         this._prompt = this._dialog = null;
         this._style = this._appliedStyle = null;
         for (const [actor, saved] of this._effects) {

@@ -5,9 +5,9 @@ export const SOFT_TINT = 0.28;
 // light foregrounds even when application appearance is light.
 const PALETTES = Object.freeze({
     dark: Object.freeze({background: '25,28,35', foreground: '242,242,242',
-        edge: '255,255,255,0.12', activeEdge: '255,255,255,0.18', inactiveEdge: '255,255,255,0.05', highlight: '255,255,255'}),
+        edge: '255,255,255,0.12', glassEdge: '255,255,255,0.16', activeEdge: '255,255,255,0.18', inactiveEdge: '255,255,255,0.05', highlight: '255,255,255'}),
     light: Object.freeze({background: '236,239,244', foreground: '28,30,40',
-        edge: '20,25,35,0.10', activeEdge: '20,25,35,0.16', inactiveEdge: '20,25,35,0.05', highlight: '28,30,40'}),
+        edge: '20,25,35,0.10', glassEdge: '255,255,255,0.28', activeEdge: '20,25,35,0.16', inactiveEdge: '20,25,35,0.05', highlight: '28,30,40'}),
 });
 export const MATERIAL_STATES = Object.freeze({hover: 0.08, focus: 0.16, pressed: 0.22, disabled: 0.4});
 let desktopStyle = {fontStyle: '', selection: '80,140,220'};

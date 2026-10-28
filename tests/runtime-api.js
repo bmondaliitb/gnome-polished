@@ -34,6 +34,9 @@ const theme = new St.Theme();
 const stylesheet = Gio.File.new_for_path('polished@local/stylesheet.css');
 theme.load_stylesheet(stylesheet);
 theme.unload_stylesheet(stylesheet);
+const loginStyle = Gio.File.new_for_path('integration/login/stylesheet.css');
+theme.load_stylesheet(loginStyle);
+theme.unload_stylesheet(loginStyle);
 for (const method of ['get_debug_flags', 'add_debug_flags', 'remove_debug_flags'])
     if (typeof Clutter[method] !== 'function') throw new Error(`Missing ${method}`);
 if (!Clutter.DrawDebugFlag.DISABLE_CLIPPED_REDRAWS) throw new Error('Missing redraw compatibility flag');

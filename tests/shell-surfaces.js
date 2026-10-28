@@ -85,7 +85,7 @@ dark=false;manager.refresh();
 assert(menu.has_style_class_name('polished-material-light')&&!menu.has_style_class_name('polished-material-dark')&&
     overlays.every(actor=>actor.has_style_class_name('polished-material-dark')),'Appearance replacement keeps native-light overlays dark');
 const effect=menu.effects[0];context={...context,...materialValues(0)};manager.refresh();
-assert(menu.effects[0]===effect&&menu.style.includes('rgba(236,239,244,0.4)')&&effect.veil[3]===0,
+assert(menu.effects[0]===effect&&menu.style.includes('rgba(236,239,244,0.76)')&&effect.clientTintOpacity<1&&effect.veil[3]===0,
     'Changing density reuses the existing filter and updates only material weights');
 context.powerSaver=true;context.dockGlass=false;manager.refresh();
 assert(dock.effects.length===0&&dock.style.includes('background-color: rgba(')&&menu.effects.length===1,
@@ -133,6 +133,21 @@ context.smoothPerformance=true;manager.refresh();
 menu.set_style('external-style: preserved;');active=false;manager.refresh();
 assert(menu.style==='external-style: preserved;'&&panel.style==='background-color: #131313 !important;'&&
     !panel.has_style_class_name('polished-panel-light')&&!menu.has_style_class_name('polished-material-light'),'Suspension preserves external styles and removes owned classes');
+
+context={...materialValues(50)};dark=true;manager._permitted=()=>true;manager.refresh();
+for(const actor of [menu,dateMenu,quickSettings,dock,banner]) {
+    const effect=actor.effects[0];
+    assert(effect && effect.clientTintOpacity>=0.70 && effect.clientTintOpacity<1,
+        'Floating glass lightens background tint without fading native text');
+    assert(effect.radius===36 && effect.brightness===0.90,
+        'More visible glass reuses the same blur radius with a gentler dark veil');
+}
+assert(dock.style.includes('rgba(25,28,35,0.76)') && menu.style.includes('border-top-color:'),
+    'Native coverage stays above the shape threshold and glass edges get a faint highlight');
+context={...materialValues(100)};manager.refresh();
+assert(menu.effects[0].clientTintOpacity===1,'Maximum clarity keeps a fully dense menu tint');
+
+
 manager.destroy();assert(!callbacks.size&&!tracked.size,'Disable releases pending work and redraw references');
 assert(dock.has_style_class_name('polished-material-dark'),'Cleanup preserves a preexisting palette class');
 function clean(actor){assert(!actor.signals.size&&!actor.effects.length,'Actor lifecycle is fully released');for(const child of actor.children)clean(child);}

@@ -124,7 +124,8 @@ export default class Polished extends Extension {
             () => this._settings.get_boolean('enabled') && !this._reduced() && !Main.sessionMode.isLocked,
             () => this._context());
         this._lockMaterial = new LockMaterial(Main.screenShield,
-            () => this._settings.get_boolean('enabled') && !this._reduced() && Main.sessionMode.isLocked);
+            () => this._settings.get_boolean('enabled') && !this._reduced() && Main.sessionMode.isLocked,
+            () => this._context());
         this._button.visible = this._settings.get_boolean('show-panel-indicator') && !Main.sessionMode.isLocked;
         for (const actor of global.get_window_actors())
             this._watch(actor);

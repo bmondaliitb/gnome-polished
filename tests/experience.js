@@ -34,3 +34,8 @@ assert(probe.state.onBattery&&changes===3,'UPower unplug events refresh appearan
 onBattery=false;Experience.prototype._sync.call(probe);
 assert(!probe.state.onBattery&&changes===4,'Plugging in restores AC state');
 print('Hierarchy, wallpaper contrast and independent battery/Power Saver checks passed');
+
+assert(surfaceOpacity('menus',0.76,true)===0.68 && surfaceOpacity('notifications',0.76,true)===0.73 &&
+    surfaceOpacity('dock',0.76,true)===0.60, 'Airy glass exposes more backdrop color with role-specific density');
+assert(surfaceOpacity('menus',1,true)===1 && surfaceOpacity('menus',0.4,true)>=0.56,
+    'Glass tint relief preserves maximum clarity and a readable minimum');
