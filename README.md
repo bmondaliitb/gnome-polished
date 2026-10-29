@@ -90,12 +90,6 @@ Fractional-scale capture coverage is regression-tested at 100%, 125%, 150%, 175%
 
 ## Undo
 
-```sh
-gnome-extensions disable polished@local
-```
+For a complete rollback, follow [Completely undo Polished, Prism and Polished Minimum](docs/UNDO.md). It covers leftover GTK styles, dock/buttons/wallpaper settings, and **both** separately installed login-screen companions, with backups and verification.
 
-This restores owned styles, original client opacity, native effects and GTK rules while preserving unrelated user CSS. Restart GTK4 applications. To return to Prism:
-
-```sh
-gnome-extensions enable prism@local
-```
+Disabling `polished@local` removes its live Shell effects, but is not a complete rollback of explicitly applied desktop profiles or system GDM changes. Already-running GTK apps must also exit to unload their styles. No system cleanup runs merely by opening this guide.
