@@ -51,3 +51,8 @@ check-runtime-api:
 .PHONY: check-wallpapers
 check-wallpapers:
 	gjs -m tests/quiet-wallpaper.js --render
+
+.PHONY: check-gtk-contrast
+check-gtk-contrast:
+	gjs -m tests/gtk-menus.js
+	/usr/bin/python3 tests/gtk-menu-contrast.py

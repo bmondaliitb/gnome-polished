@@ -29,7 +29,8 @@ export function eligible({normal, fullscreen, minimized}) {
 
 export function shellSurfaceKind(classes) {
     const names = new Set(classes.split(/\s+/));
-    if (['switcher-list', 'osd-window', 'dash-label', 'screenshot-ui-tooltip', 'tooltip']
+    if (names.has('switcher-list')) return 'switchers';
+    if (['osd-window', 'dash-label', 'screenshot-ui-tooltip', 'tooltip']
         .some(name => names.has(name))) return 'overlays';
     if (names.has('dash-background')) return 'dock';
     if (['popup-menu-content', 'quick-settings', 'popup-menu-boxpointer',

@@ -147,11 +147,14 @@ export class ShellSurfaces {
             }
         }
         if (kind) return {kind, role};
-        // Color actual text/icons only. Workspace dots and layout/drawing
-        // widgets rely on their native theme geometry and must stay untouched.
+        // Workspace dots paint a background rather than text. Change only
+        // their paint color; retain native sizing, animation and input geometry.
         for (let parent = this._parents.get(actor); parent; parent = this._parents.get(parent)) {
-            if (parent === this._panel) return actor instanceof St.Label || actor instanceof St.Icon
-                ? {kind: 'panel', role: 'foreground'} : {kind: null, role: null};
+            if (parent === this._panel) {
+                if (classes.split(/\s+/).includes('workspace-dot')) return {kind: 'panel', role: 'indicator'};
+                return actor instanceof St.Label || actor instanceof St.Icon
+                    ? {kind: 'panel', role: 'foreground'} : {kind: null, role: null};
+            }
             if (shellSurfaceKind(parent.get_style_class_name?.() ?? '')) break;
         }
         if (role === 'inset') {
@@ -222,13 +225,15 @@ export class ShellSurfaces {
             } else if (actor.get_style() !== saved.appliedStyle) {
                 saved.style = actor.get_style();
             }
+            const surfaceDark = dark || kind === 'overlays' || kind === 'switchers';
+            const surfaceColors = surfacePalette(surfaceDark);
             this._syncClass(actor, saved, role === 'surface' && kind !== 'panel'
-                ? `polished-material-${kind === 'overlays' || dark ? 'dark' : 'light'}`
+                ? `polished-material-${surfaceDark ? 'dark' : 'light'}`
                 : actor === this._panel ? `polished-panel-${panelDark ? 'dark' : 'light'}` : null);
             const radii = role === 'surface' ? this._radii(actor, kind) : null;
             saved.kind = kind;
             saved.radiiKey = JSON.stringify(radii);
-            // The top bar and short-lived overlays are tint-only. Unknown
+            // The top bar, tooltips and OSD are tint-only; switchers use cached glass. Unknown
             // native shapes also keep tint rather than risk rectangular edges.
             const glass = !context.smoothPerformance &&
                 (kind === 'dock' ? context.dockGlass !== false : context.menuGlass !== false);
@@ -253,8 +258,8 @@ export class ShellSurfaces {
                 saved.effect.nativeShape = true;
                 saved.effect.radii = radii;
                 saved.effect.radius = 36;
-                saved.effect.brightness = dark ? 0.90 : 1;
-                saved.effect.veil = [...(dark ? [0.10, 0.11, 0.14] : [0.94, 0.95, 0.97]), context.detail * 0.8 / 100];
+                saved.effect.brightness = surfaceDark ? 0.90 : 1;
+                saved.effect.veil = [...(surfaceDark ? [0.10, 0.11, 0.14] : [0.94, 0.95, 0.97]), context.detail * 0.8 / 100];
                 const paintKey = JSON.stringify([radii, saved.effect.brightness, saved.effect.veil, saved.effect.clientTintOpacity]);
                 if (saved.paintKey !== paintKey) {
                     saved.paintKey = paintKey;
@@ -271,7 +276,7 @@ export class ShellSurfaces {
                 : saved.effect ? nativeAlpha : surfaceOpacity(kind, alpha);
             const background = role === 'surface'
                 ? (kind === 'panel' ? `rgba(${panelTint},${panelAlpha})`
-                    : `rgba(${kind === 'overlays' ? surfacePalette(true).background : tint},${materialAlpha})`) : 'transparent';
+                    : `rgba(${surfaceColors.background},${materialAlpha})`) : 'transparent';
             const pointer = role === 'pointer' ? '-arrow-background-color: transparent !important;'
                 : role === 'pointer-fill' ? `-arrow-background-color: rgba(${tint},${materialAlpha}) !important;` : '';
             const base = saved.style?.trim() ?? '';
@@ -279,11 +284,12 @@ export class ShellSurfaces {
             // in light mode; keep their backing dark and their colors intact.
             const foreground = role === 'foreground' ? `color: rgb(${panelForeground}) !important;`
                 : role === 'surface' && kind !== 'panel'
-                    ? `color: rgb(${surfacePalette(kind === 'overlays' || dark).foreground}) !important;` : '';
+                    ? `color: rgb(${surfaceColors.foreground}) !important;` : '';
             const font = role === 'surface' ? palette.fontStyle : '';
             const messageCard = role === 'inset' && kind === 'menus' &&
                 (actor.get_style_class_name?.() ?? '').split(/\s+/).includes('message');
-            const fill = messageCard ? 'background-image: none !important;'
+            const fill = role === 'indicator' ? `background-color: rgb(${panelForeground}) !important;`
+                : messageCard ? 'background-image: none !important;'
                 : role === 'foreground' ? ''
                 : `background-image: none !important; background-color: ${background} !important; ${pointer}`;
             // An inset rim is visible even when the dock theme has zero border
@@ -292,7 +298,7 @@ export class ShellSurfaces {
             const edge = role === 'surface' && kind === 'dock'
                 ? `border-color: transparent; box-shadow: inset 0 0 0 1px rgba(${saved.effect ? palette.glassEdge : palette.edge}) !important;`
                 : role === 'surface' && kind !== 'panel'
-                    ? `border-color: rgba(${kind === 'overlays' ? surfacePalette(true).edge : palette.edge}); ${saved.effect ? `border-top-color: rgba(${palette.glassEdge});` : ''} box-shadow: 0 ${kind === 'overlays' ? '4px 12px' : '6px 18px'} 0 rgba(0,0,0,${kind === 'overlays' || dark ? 0.24 : 0.14});` : '';
+                    ? `border-color: rgba(${surfaceColors.edge}); ${saved.effect ? `border-top-color: rgba(${surfaceColors.glassEdge});` : ''} box-shadow: 0 ${kind === 'overlays' ? '4px 12px' : '6px 18px'} 0 rgba(0,0,0,${surfaceDark ? 0.24 : 0.14});` : '';
             saved.appliedStyle = `${base}${base && !base.endsWith(';') ? ';' : ''} ${fill} ${foreground} ${edge} ${font}`;
             if (actor.get_style() !== saved.appliedStyle) {
                 this._settingStyle = true;

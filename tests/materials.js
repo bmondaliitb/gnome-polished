@@ -16,7 +16,7 @@ for (const dark of [true, false]) {
 }
 assert(SOFT_TINT===0.28 && surfacePalette(true).background==='25,28,35','Shared Soft appearance is unchanged');
 for(const [classes,kind] of [['dash-background','dock'],['popup-menu-content','menus'],['quick-settings','menus'],
-    ['modal-dialog','dialogs'],['notification-banner','notifications'],['switcher-list','overlays'],['osd-window','overlays']])
+    ['modal-dialog','dialogs'],['notification-banner','notifications'],['switcher-list','switchers'],['osd-window','overlays']])
     assert(shellSurfaceKind(classes)===kind,'Surface classification remains');
 assert(shellSurfaceKind('popup-menu-item')===null && shellSurfaceRole('calendar')==='inset' &&
     shellSurfaceRole('popup-menu-boxpointer')==='pointer','Foreground/inset/BoxPointer roles remain separate');

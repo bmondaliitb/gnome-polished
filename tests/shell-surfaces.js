@@ -42,18 +42,21 @@ const panelPopup=new Actor('popup-menu-content',[popupLabel]);
 const panel=new Actor('panel',[button,panelPopup]);panel.style='background-color: #131313 !important;';
 const dock=new Actor('dash-background polished-material-dark'),dialog=new Actor('modal-dialog'),message=new Actor('message');
 const banner=new Actor('notification-banner',[message]),looseCalendar=new Actor('calendar');
-const overlays=['osd-window','switcher-list','dash-label','tooltip'].map(name=>new Actor(name));
-const root=new Actor('',[pointer,new Actor('popup-menu-boxpointer',[dateMenu]),new Actor('popup-menu-boxpointer',[quickSettings]),orphan,panel,dock,dialog,banner,looseCalendar,...overlays]);
+const switcher=new Actor('switcher-list');
+const overlays=['osd-window','dash-label','tooltip'].map(name=>new Actor(name));
+const root=new Actor('',[pointer,new Actor('popup-menu-boxpointer',[dateMenu]),new Actor('popup-menu-boxpointer',[quickSettings]),orphan,panel,dock,dialog,banner,looseCalendar,switcher,...overlays]);
 let active=false,dark=true,context={...materialValues(50),luminance:null,powerSaver:false};
 const tracked=new Map(),guard={track:(actor,on)=>on?tracked.set(actor,true):tracked.delete(actor),untrack:actor=>tracked.delete(actor)};
 const manager=new Manager(root,panel,()=>dark,()=>active,guard,()=>context);
 function flush(){for(const [key,callback]of [...callbacks]){callbacks.delete(key);callback();}}
 active=true;manager.refresh();
 assert(menu.effects.length===1&&floating.effects.length===1&&dock.effects.length===1,'Unified menus, floating submenus and dock receive cached frost');
-for(const actor of [menu,dateMenu,quickSettings,dock,dialog,banner])
+for(const actor of [menu,dateMenu,quickSettings,dock,dialog,banner,switcher])
     assert(actor.effects.length===1&&actor.effects[0].nativeShape===true,
         'Shell glass follows native paint coverage rather than filling transparent margins and shadows');
 assert(submenu.effects.length===0&&submenu.style.includes('background-color: transparent'),'Inline submenus share parent tint and filter');
+assert(switcher.effects.length===1&&switcher.effects[0].nativeShape&&tracked.has(switcher),
+    'Alt+Tab uses cached frost rather than a transparent tint alone');
 assert(panel.effects.length===0&&overlays.every(actor=>!actor.effects.length),'Panel and lightweight overlays never capture a backdrop');
 assert(pointer.style.includes('-arrow-background-color: transparent')&&repaints>0&&pointer.effects.length===0,'BoxPointer backing does not duplicate the material');
 assert(orphan.style.includes('-arrow-background-color: rgba(25,28,35,0.76)'),'Unknown popup keeps tinted backing');
@@ -67,11 +70,17 @@ assert(dock.style.includes('box-shadow: inset 0 0 0 1px rgba(')&&
     !dock.style.includes('border-width:')&&!dock.style.includes('border-radius: 12px'),
     'Dock rim is visible without a native border and preserves theme geometry');
 assert(clock.style.includes('color: rgb(')&&icon.style.includes('color: rgb(')&&
-    button.style==='border-radius: 8px;'&&dot.style==='border-radius: 8px;'&&layout.style==='border-radius: 8px;',
+    button.style==='border-radius: 8px;'&&dot.style.includes('background-color: rgb(')&&layout.style==='border-radius: 8px;',
     'Panel leaf foregrounds are readable without touching workspace geometry');
 assert(popupLabel.style==='border-radius: 8px;','Panel foreground overrides do not leak into popup rows');
 assert(panel.has_style_class_name('polished-panel-dark'),'Top-bar typography is scoped to an owned contrast class');
 assert(menu.has_style_class_name('polished-material-dark'),'Owned palette class scopes row styling');
+context.luminance=1;dark=false;manager.refresh();
+assert(dot.style.includes('rgb(16,20,26)') && !dot.style.includes('border-radius: 12px') && dot.effects.length===0,
+    'Workspace dots paint dark on a light panel without changing geometry or adding effects');
+context.luminance=0;manager.refresh();
+assert(dot.style.includes('rgb(246,247,249)'), 'Workspace dots follow the contrast decision on dark wallpaper');
+context.luminance=null;dark=true;manager.refresh();
 const redraws=menu.redraws;manager.refresh();card.emit('style-changed');flush();
 assert(menu.effects.length===1&&menu.redraws===redraws&&callbacks.size===0,'Hover/owned styles neither duplicate effects nor invalidate snapshots');
 for(const actor of [row,clock,icon,panel,menu,card])actor.emit('style-changed');
@@ -83,7 +92,8 @@ menu.emit('notify::mapped');assert(menu.effects[0].invalidations===1,'Reopened p
 manager.refreshBackdrops();assert(menu.effects[0].invalidations===2,'Manual refresh invalidates snapshots');
 dark=false;manager.refresh();
 assert(menu.has_style_class_name('polished-material-light')&&!menu.has_style_class_name('polished-material-dark')&&
-    overlays.every(actor=>actor.has_style_class_name('polished-material-dark')),'Appearance replacement keeps native-light overlays dark');
+    [switcher,...overlays].every(actor=>actor.has_style_class_name('polished-material-dark')) &&
+    switcher.style.includes('rgba(25,28,35,') && switcher.effects[0].brightness===0.90,'Appearance replacement keeps native-light overlays dark');
 const effect=menu.effects[0];context={...context,...materialValues(0)};manager.refresh();
 assert(menu.effects[0]===effect&&menu.style.includes('rgba(236,239,244,0.76)')&&effect.clientTintOpacity<1&&effect.veil[3]===0,
     'Changing density reuses the existing filter and updates only material weights');
@@ -116,7 +126,7 @@ assert(dynamic.effects.length===0&&dynamic.signals.size===0&&dynamic.style==='bo
 context.smoothPerformance=true;manager.refresh();
 assert(panel.style.includes('rgba(236,239,244,0.72)')&&panel.has_style_class_name('polished-panel-light'),
     'Smooth top bar uses the shared neutral palette with a stable readable backing');
-assert(tracked.size===0&&[menu,floating,dock,dialog,banner,...overlays].every(actor=>actor.effects.length===0),
+assert(tracked.size===0&&[menu,floating,dock,dialog,banner,switcher,...overlays].every(actor=>actor.effects.length===0),
     'Smooth mode removes all owned Shell backdrop effects and releases broad-redraw tracking');
 assert(menu.style.includes('rgba(236,239,244,0.94)')&&dock.style.includes('rgba(236,239,244,0.94)')&&
     menu.has_style_class_name('polished-material-light')&&dock.style.includes('box-shadow: inset'),
@@ -127,15 +137,17 @@ assert(menu.effects.length===1&&tracked.has(menu),'Glass mode restores backdrop 
 context.menuGlass=false;context.dockGlass=true;manager.refresh();
 assert(menu.effects.length===0&&menu.style.includes('rgba(236,239,244,0.94)')&&dock.effects.length===1,
     'Menu and dock glass can be controlled independently');
+assert(!switcher.effects.length&&switcher.style.includes('0.94'), 'Battery menu-glass opt-out gives the switcher a dense fallback');
 context.menuGlass=true;context.dockGlass=false;manager.refresh();
 assert(menu.effects.length===1&&dock.effects.length===0,'Battery defaults preserve menu frost while dropping dock frost');
+assert(switcher.effects.length===1, 'Restoring menu glass also restores Alt+Tab blur');
 context.smoothPerformance=true;manager.refresh();
 menu.set_style('external-style: preserved;');active=false;manager.refresh();
 assert(menu.style==='external-style: preserved;'&&panel.style==='background-color: #131313 !important;'&&
     !panel.has_style_class_name('polished-panel-light')&&!menu.has_style_class_name('polished-material-light'),'Suspension preserves external styles and removes owned classes');
 
 context={...materialValues(50)};dark=true;manager._permitted=()=>true;manager.refresh();
-for(const actor of [menu,dateMenu,quickSettings,dock,banner]) {
+for(const actor of [menu,dateMenu,quickSettings,dock,banner,switcher]) {
     const effect=actor.effects[0];
     assert(effect && effect.clientTintOpacity>=0.70 && effect.clientTintOpacity<1,
         'Floating glass lightens background tint without fading native text');

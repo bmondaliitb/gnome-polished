@@ -14,7 +14,9 @@ export function gtkMenuCss(dark, opacity) {
     const palette = surfacePalette(dark);
     const bg = palette.background;
     const fg = palette.foreground;
-    const alpha = Math.max(40, Math.min(100, opacity)) / 100;
+    // GTK popovers can be composited over either light Files or a dark terminal.
+    // A shared readable floor keeps light menus from taking on the host app's color.
+    const alpha = Math.max(dark ? 40 : 94, Math.min(100, opacity)) / 100;
     const item = 'popover.menu modelbutton, popover.menu button.model';
     const state = suffix => `popover.menu modelbutton${suffix}, popover.menu button.model${suffix}`;
     return `${OWNER}
@@ -50,7 +52,13 @@ export function gtkMenuCss(dark, opacity) {
   }
   ${item} {
     border-radius: 10px; min-height: 24px; padding: 8px 12px;
-    background-image: none; color: rgb(${fg});
+    background-color: transparent; background-image: none; color: rgb(${fg});
+  }
+  /* Descendant nodes may keep an app's dark foreground instead of inheriting
+   * the menu color. Pair them explicitly with our locally owned backing. */
+  popover.menu label, popover.menu image,
+  popover.menu check, popover.menu radio {
+    color: rgb(${fg});
   }
   ${state(':hover')} {
     background-color: rgba(${palette.highlight},${MATERIAL_STATES.hover});
@@ -61,9 +69,15 @@ export function gtkMenuCss(dark, opacity) {
   ${state(':active')} {
     background-color: rgba(${palette.selection},${MATERIAL_STATES.pressed});
   }
-  ${state(':disabled')} { color: rgba(${fg},${MATERIAL_STATES.disabled}); }
+  ${state(':disabled')},
+  popover.menu modelbutton:disabled label, popover.menu modelbutton:disabled image,
+  popover.menu button.model:disabled label, popover.menu button.model:disabled image,
+  popover.menu check:disabled, popover.menu radio:disabled {
+    color: rgba(${fg},${MATERIAL_STATES.disabled});
+  }
   popover.menu modelbutton accelerator, popover.menu modelbutton .accelerator,
-  popover.menu button.model accelerator, popover.menu button.model .accelerator {
+  popover.menu button.model accelerator, popover.menu button.model .accelerator,
+  popover.menu modelbutton .accelerator label, popover.menu button.model .accelerator label {
     color: rgba(${fg},0.68);
   }
   popover.menu label.heading, popover.menu label.title {
@@ -79,6 +93,7 @@ export function gtkMenuCss(dark, opacity) {
     padding: 8px 12px;
     box-shadow: 0 4px 12px rgba(0,0,0,${dark ? 0.24 : 0.14});
   }
+  tooltip.background label, tooltip.background image { color: rgb(${fg}); }
   popover.menu separator {
     background-color: rgba(${fg},0.14); min-height: 1px; margin: 6px 8px;
   }
@@ -121,7 +136,10 @@ export class GtkMenuStyle {
             this._write(this.generated, css);
             // Snap/portal theme forwarding may copy gtk.css but not adjacent files.
             // Keep the active rules self-contained instead of using a relative import.
-            this._write(this.main, `${BEGIN}\n${css}\n${END}\n` + withoutManagedMenuCss(main));
+            // Keep the active material last. Older managed themes may still be in
+            // the user's file; preserve them verbatim without letting them pair
+            // their dark fill with our light foreground (or the reverse).
+            this._write(this.main, withoutManagedMenuCss(main) + `${BEGIN}\n${css}\n${END}\n`);
         } else {
             const cleaned = withoutManagedMenuCss(main);
             if (main !== cleaned) this._write(this.main, cleaned);
