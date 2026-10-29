@@ -90,6 +90,14 @@ Fractional-scale capture coverage is regression-tested at 100%, 125%, 150%, 175%
 
 ## Undo
 
-For a complete rollback, follow [Completely undo Polished, Prism and Polished Minimum](docs/UNDO.md). It covers leftover GTK styles, dock/buttons/wallpaper settings, and **both** separately installed login-screen companions, with backups and verification.
+For a complete rollback, run this as your normal desktop user (it requests administrator access only for login-screen cleanup):
+
+```sh
+/usr/bin/python3 tools/undo-all.py --apply
+```
+
+Omit `--apply` for a preview. Backups are retained; reboot after completion. The script does not restart GDM or reboot automatically.
+
+See [Completely undo Polished, Prism and Polished Minimum](docs/UNDO.md). It covers leftover GTK styles, dock/buttons/wallpaper settings, and **both** separately installed login-screen companions, with backups and verification.
 
 Disabling `polished@local` removes its live Shell effects, but is not a complete rollback of explicitly applied desktop profiles or system GDM changes. Already-running GTK apps must also exit to unload their styles. No system cleanup runs merely by opening this guide.

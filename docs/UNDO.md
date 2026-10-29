@@ -4,6 +4,32 @@ Disabling a desktop extension removes its live Shell effects. It does **not** un
 
 This guide covers the customizations found on this Ubuntu/GNOME installation. It restores the distribution's defaults, which may be Ubuntu's Yaru theme and Ubuntu wallpaper rather than upstream GNOME's Adwaita appearance. No package installation, full-home deletion, global dconf reset or login-manager restart is needed.
 
+## Single-script rollback
+
+From the `gnome-polished` checkout, preview the exact settings that will be reset:
+
+```sh
+/usr/bin/python3 tools/undo-all.py
+```
+
+Then perform the entire rollback with one command:
+
+```sh
+/usr/bin/python3 tools/undo-all.py --apply
+```
+
+Run it **as your normal desktop user, without putting `sudo` before this command**. It requests your administrator password through `sudo` only when installed login-screen companions need removal. It has no dependency on the neighboring source checkouts and can also be copied elsewhere and run with `/usr/bin/python3`.
+
+The script backs up dconf, GTK files and the selected appearance settings; disables and archives the three project desktop extensions; removes Polished/Prism menu rules; resets the appearance, wallpaper, button and dock keys listed below; clears only the three project preference namespaces; and archives the saved Minimum profile. Other extensions, application profiles, display resolution and fractional scaling remain outside its reset list. Defaults are the installed distribution defaults, not a reconstruction of personal preferences from before customization.
+
+User recovery copies are stored in `$XDG_STATE_HOME/gnome-material-undo/<timestamp>` (normally `~/.local/state/gnome-material-undo/<timestamp>`). The privileged phase archives the two owned login installations and their original compiled database under `/var/lib/gnome-material-undo/<timestamp>`. It validates ownership and compiles/checks the future greeter configuration before moving original files. If the final database replacement fails, moved system files are restored. If a later desktop step fails, earlier completed steps remain applied; the error and backup locations are reported.
+
+The default invocation is **preview only**. `--apply --user-only` intentionally skips login-screen cleanup and requires no administrator access; it is a partial rollback when login companions are installed. Missing project installations are skipped, so the script can be rerun. Edited login ownership records, linked target paths, malformed GTK markers and unrecognized generated stylesheets are refused rather than removed.
+
+After a successful full run, save your work and **reboot**. The script never restarts GDM, kills applications, logs you out or reboots automatically. Verify using the checks in section 6 below. The manual steps that follow are an alternative to the script; you do not need to run them again after a successful scripted rollback.
+
+## Manual alternative
+
 Run these commands yourself in a normal desktop terminal. Documentation changes do not perform this rollback. Start in the `gnome-polished` checkout; the `gnome-material` and `gnome-polished-minimum` checkouts are expected beside it.
 
 ## 1. Save a recovery copy

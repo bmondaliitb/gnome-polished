@@ -1,6 +1,6 @@
 UUID = polished@local
 .PHONY: check package
-check:
+check: check-undo
 	gjs -m tests/capture-resources.js
 	gjs -m tests/shortcut-editor.js
 	gjs tools/check-syntax.js $(UUID)/captureResources.js $(UUID)/shortcutEditor.js
@@ -56,3 +56,7 @@ check-wallpapers:
 check-gtk-contrast:
 	gjs -m tests/gtk-menus.js
 	/usr/bin/python3 tests/gtk-menu-contrast.py
+
+.PHONY: check-undo
+check-undo:
+	/usr/bin/python3 tests/test_undo_all.py
